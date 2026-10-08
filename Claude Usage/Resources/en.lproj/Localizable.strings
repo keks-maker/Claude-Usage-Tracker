@@ -79,6 +79,7 @@
 "popover.daily_budget.today_limit" = "today: %@%% left of %@%% · limit at %@%%";
 "popover.daily_budget.today_limit_estimated" = "today: approx. %@%% left of %@%% · limit at ~%@%%";
 "popover.daily_budget.day_marker" = "%@: ends at %@%%";
+"popover.daily_budget.today_marker_hint" = "Unused budget stays available today and is spread over the remaining days tomorrow.";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Used";
 "menubar.remaining" = "Remaining";

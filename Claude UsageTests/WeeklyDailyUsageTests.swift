@@ -610,6 +610,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
         for index in 3...6 {          // Fri ... Mon
             XCTAssertEqual(cols[index].usage, 0)
             XCTAssertEqual(cols[index].budget ?? -1, 12.2, accuracy: 0.0001)
+            XCTAssertTrue(cols[index].isEstimated)   // future columns inherit today's estimate
             XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: cols[index].usage, budget: cols[index].budget), 1)
         }
     }
@@ -681,6 +682,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(cols[2].budget ?? -1, 12.2, accuracy: 0.0001)
         XCTAssertEqual(cols[2].usage ?? -1, 6, accuracy: 0.0001)
         XCTAssertFalse(cols[2].isEstimated)
+        XCTAssertFalse(cols[3].isEstimated)
         XCTAssertNil(cols[0].usage)
     }
 

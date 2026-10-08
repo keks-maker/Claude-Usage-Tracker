@@ -932,10 +932,7 @@ struct UsageRow: View {
                             .fill(marker.color.opacity(marker.isEstimated ? 0.4 : 1))
                             .frame(width: 2, height: 9)
                             .offset(x: round(geometry.size.width * markerFraction(marker)) - 1)
-                            .help("popover.daily_budget.day_marker".localized(
-                                with: marker.weekdayName,
-                                formatEnd(marker)
-                            ))
+                            .help(markerTooltip(marker))
                     }
                 }
             }
@@ -954,6 +951,13 @@ struct UsageRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
+    }
+
+    /// Marker tooltip; today's marker explains that unused budget stays available today
+    private func markerTooltip(_ marker: WeeklyDayMarker) -> String {
+        let base = "popover.daily_budget.day_marker".localized(with: marker.weekdayName, formatEnd(marker))
+        guard marker.isToday, displayPercentage < marker.percentage else { return base }
+        return base + "\n" + "popover.daily_budget.today_marker_hint".localized
     }
 
     private func formatEnd(_ marker: WeeklyDayMarker) -> String {

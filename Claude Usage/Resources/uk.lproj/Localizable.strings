@@ -79,6 +79,7 @@
 "popover.daily_budget.today_limit" = "сьогодні: залишок %@%% з %@%% · ліміт на %@%%";
 "popover.daily_budget.today_limit_estimated" = "сьогодні: залишок бл. %@%% з %@%% · ліміт на ~%@%%";
 "popover.daily_budget.day_marker" = "%@: закінчується на %@%%";
+"popover.daily_budget.today_marker_hint" = "Невикористаний бюджет сьогодні залишається доступним, а завтра розподіляється на решту днів.";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Використано";
 "menubar.remaining" = "Залишилось";

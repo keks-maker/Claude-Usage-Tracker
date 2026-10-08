@@ -73,6 +73,7 @@
 "popover.daily_budget.today_limit" = "今日: 残り %@%%（目安 %@%%）· 上限 %@%%";
 "popover.daily_budget.today_limit_estimated" = "今日: 残り約 %@%%（目安 約%@%%）· 上限 約%@%%";
 "popover.daily_budget.day_marker" = "%@: 終点 %@%%";
+"popover.daily_budget.today_marker_hint" = "使わなかった予算は今日も利用でき、明日以降の残り日数に配分されます。";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";

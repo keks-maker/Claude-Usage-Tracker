@@ -73,6 +73,7 @@
 "popover.daily_budget.today_limit" = "aujourd’hui : reste %@ %% sur %@ %% · limite à %@ %%";
 "popover.daily_budget.today_limit_estimated" = "aujourd’hui : reste env. %@ %% sur %@ %% · limite à env. %@ %%";
 "popover.daily_budget.day_marker" = "%@ : se termine à %@ %%";
+"popover.daily_budget.today_marker_hint" = "Le budget non utilisé reste disponible aujourd’hui et sera réparti sur les jours restants demain.";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilisé";
 "menubar.remaining" = "Restant";

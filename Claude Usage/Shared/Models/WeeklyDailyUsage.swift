@@ -277,7 +277,8 @@ enum WeeklyDailyUsage {
     ///   the day stands in for the day start, so the budget is an estimate (`isEstimated`) and the
     ///   measured usage is a lower bound.
     /// - Days after today: usage 0 and `futureDailyBudget`, the same per-day step as the markers
-    ///   of those days (one chain with today's budget end, see `futureDailyBudget`).
+    ///   of those days (one chain with today's budget end, see `futureDailyBudget`); they inherit
+    ///   today's `isEstimated`.
     static func columnValues(
         snapshots: [DailyWeeklySnapshot],
         currentWeeklyPercentage: Double,
@@ -300,7 +301,7 @@ enum WeeklyDailyUsage {
                 return ColumnValue(usage: live, budget: todayB, isEstimated: !reliable)
             }
             if day > today {
-                return ColumnValue(usage: 0, budget: rest)
+                return ColumnValue(usage: 0, budget: rest, isEstimated: !reliable)
             }
             return ColumnValue(usage: usages[index], budget: stored[index])
         }

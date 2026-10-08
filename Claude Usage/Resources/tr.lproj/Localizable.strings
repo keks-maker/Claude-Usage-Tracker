@@ -79,6 +79,7 @@
 "popover.daily_budget.today_limit" = "bugün: kalan %@%% / %@%% · sınır %@%%";
 "popover.daily_budget.today_limit_estimated" = "bugün: yaklaşık kalan %@%% / %@%% · sınır ~%@%%";
 "popover.daily_budget.day_marker" = "%@: %@%% noktasında biter";
+"popover.daily_budget.today_marker_hint" = "Kullanılmayan bütçe bugün kullanılabilir kalır ve yarın kalan günlere dağıtılır.";
 "menubar.anthropic_console" = "Anthropic API Konsolu";
 "menubar.used" = "Kullanılan";
 "menubar.remaining" = "Kalan";

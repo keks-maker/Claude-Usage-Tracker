@@ -35,6 +35,7 @@ struct WeeklyDayMarker: Equatable {
     let weekdayName: String
     let percentage: Double
     let isEstimated: Bool
+    let isToday: Bool
     let color: Color
 
     /// Markers for the days of the current weekly window (nothing for past days).
@@ -46,6 +47,7 @@ struct WeeklyDayMarker: Equatable {
         calendar: Calendar
     ) -> [WeeklyDayMarker] {
         let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let todayStart = calendar.startOfDay(for: now)
         return WeeklyDailyUsage.columnMarkers(
             snapshots: snapshots,
             currentWeeklyPercentage: currentWeeklyPercentage,
@@ -58,6 +60,7 @@ struct WeeklyDayMarker: Equatable {
                 weekdayName: WeeklyDayPalette.weekdayName(days[marker.columnIndex]),
                 percentage: marker.percentage,
                 isEstimated: marker.isEstimated,
+                isToday: days[marker.columnIndex] == todayStart,
                 color: WeeklyDayPalette.color(for: marker.columnIndex)
             )
         }
@@ -120,6 +123,7 @@ struct WeeklyDailyBreakdownView: View {
                         remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
                         isOverBudget: isOverBudget(usage: usage, budget: dayBudget),
                         isToday: isToday,
+                        isEstimatedFuture: columns[index].isEstimated && (todayIndex.map { index > $0 } ?? false),
                         color: WeeklyDayPalette.color(for: index)
                     )
                 }
@@ -162,9 +166,10 @@ struct WeeklyDailyBreakdownView: View {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
-    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool, color: Color) -> some View {
+    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool, isEstimatedFuture: Bool, color: Color) -> some View {
         VStack(spacing: 2) {
             budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget, color: color)
+                .opacity(isEstimatedFuture ? 0.6 : 1)
                 .frame(maxWidth: .infinity, maxHeight: barAreaHeight)
 
             Text(Self.weekdayFormatter.string(from: day))
