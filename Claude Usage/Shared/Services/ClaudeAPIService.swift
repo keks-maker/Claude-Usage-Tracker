@@ -788,7 +788,7 @@ class ClaudeAPIService: APIServiceProtocol {
 
     // MARK: - Response Parsing
 
-    private func parseUsageResponse(_ data: Data) throws -> ClaudeUsage {
+    func parseUsageResponse(_ data: Data) throws -> ClaudeUsage {
         // Parse Claude's actual API response structure
 
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -970,7 +970,7 @@ class ClaudeAPIService: APIServiceProtocol {
     /// Parses usage data from Messages API rate limit response headers.
     /// Headers use format: anthropic-ratelimit-unified-{window}-{field}
     /// Utilization values are 0.0-1.0 (converted to 0-100 percentage).
-    private func parseUsageFromRateLimitHeaders(_ response: HTTPURLResponse) -> ClaudeUsage {
+    func parseUsageFromRateLimitHeaders(_ response: HTTPURLResponse) -> ClaudeUsage {
         func headerDouble(_ name: String) -> Double? {
             if let value = response.value(forHTTPHeaderField: name) {
                 return Double(value)

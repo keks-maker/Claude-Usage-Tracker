@@ -124,7 +124,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
         let result = WeeklyDailyUsage.applying(
             percentage: 3,
-            at: Self.date(2026, 10, 12, 13, 30),  // Mon right after the reset
+            at: Self.date(2026, 10, 13, 9, 0),  // Tue: first column of the new week (Mon after the reset has none)
             weeklyResetTime: newReset,
             to: existing,
             calendar: calendar
@@ -153,6 +153,38 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
         let now = Self.date(2026, 10, 8, 12, 0)
         XCTAssertTrue(WeeklyDailyUsage.applying(percentage: .nan, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar).isEmpty)
+    }
+
+    func testApplying_observationOnFirstWeekdayHasNoColumnAndIsNotStored() {
+        // Reset Mon 10-12 12:59. Mon 10-05 13:00 is inside the 7 x 24 h window, but
+        // the first column is Tue 10-06, so this observation must not be accepted.
+        let now = Self.date(2026, 10, 5, 13, 0)
+        XCTAssertFalse(WeeklyDailyUsage.isInColumns(now, weeklyResetTime: resetTime, calendar: calendar))
+        XCTAssertTrue(WeeklyDailyUsage.applying(percentage: 10, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar).isEmpty)
+    }
+
+    func testApplying_firstColumnDayIsStoredAndShown() {
+        // Tue 10-06 13:00 is inside the window and on the first column
+        let now = Self.date(2026, 10, 6, 13, 0)
+        let stored = WeeklyDailyUsage.applying(percentage: 10, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar)
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(stored.first?.dayStart, days.first)
+        XCTAssertNotNil(WeeklyDailyUsage.dailyUsage(snapshots: stored, weeklyResetTime: resetTime, calendar: calendar)[0])
+    }
+
+    func testApplying_everyAcceptedObservationIsShownInItsColumn() {
+        // Hourly over the whole window: each accepted observation (incl. today) must have a column
+        var time = WeeklyDailyUsage.weekStart(for: resetTime)
+        var acceptedCount = 0
+        while time < resetTime {
+            let stored = WeeklyDailyUsage.applying(percentage: 10, at: time, weeklyResetTime: resetTime, to: [], calendar: calendar)
+            if !stored.isEmpty {
+                acceptedCount += 1
+                XCTAssertNotNil(WeeklyDailyUsage.todaySnapshot(in: stored, now: time, calendar: calendar), "no column for \(time)")
+            }
+            time = time.addingTimeInterval(60 * 60)
+        }
+        XCTAssertGreaterThan(acceptedCount, 150)
     }
 
     func testDayStarts_sevenColumnsEndingWithResetDay() {
@@ -235,7 +267,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
         // Response without seven_day.resets_at: fallback date, flag false
         var fallback = ClaudeUsage.empty
         fallback.weeklyPercentage = 99
-        fallback.weeklyResetTime = Date().nextMonday1259pm(in: calendar.timeZone)
+        fallback.weeklyResetTime = Self.date(2026, 10, 19, 12, 59)
         fallback.weeklyResetIsFromAPI = false
         store.recordUsage(fallback, for: profileId, now: now.addingTimeInterval(7200), calendar: calendar)
 

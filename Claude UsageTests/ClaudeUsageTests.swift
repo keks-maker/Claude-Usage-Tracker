@@ -298,3 +298,54 @@ final class ClaudeCodeSyncServiceLogicTests: XCTestCase {
     }
 }
 
+final class ClaudeAPIWeeklyResetFlagTests: XCTestCase {
+    private let resetEpoch: TimeInterval = 1791802740  // 2026-10-12 10:59:00 UTC
+
+    private func makeService() -> ClaudeAPIService {
+        ClaudeAPIService(sessionKeyPath: URL(fileURLWithPath: "/nonexistent/claude-session-key"))
+    }
+
+    func testResponseWithSevenDayResetsAtSetsFlagAndDate() throws {
+        let json = #"{"seven_day":{"utilization":20,"resets_at":"2026-10-12T10:59:00.000Z"}}"#
+        let usage = try makeService().parseUsageResponse(Data(json.utf8))
+        XCTAssertTrue(usage.weeklyResetIsFromAPI)
+        XCTAssertEqual(usage.weeklyResetTime.timeIntervalSince1970, resetEpoch, accuracy: 0.5)
+        XCTAssertEqual(usage.weeklyPercentage, 20, accuracy: 0.0001)
+    }
+
+    func testResponseWithoutSevenDayResetsAtClearsFlag() throws {
+        let json = #"{"seven_day":{"utilization":20}}"#
+        let usage = try makeService().parseUsageResponse(Data(json.utf8))
+        XCTAssertFalse(usage.weeklyResetIsFromAPI)
+    }
+
+    func testResponseWithoutSevenDayClearsFlag() throws {
+        let usage = try makeService().parseUsageResponse(Data(#"{"five_hour":{"utilization":5}}"#.utf8))
+        XCTAssertFalse(usage.weeklyResetIsFromAPI)
+    }
+
+    func testHeadersWithSevenDayResetSetFlagAndDate() throws {
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: URL(string: "https://claude.ai/api/usage")!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "anthropic-ratelimit-unified-7d-utilization": "0.2",
+                "anthropic-ratelimit-unified-7d-reset": "1791802740"
+            ]
+        ))
+        let usage = makeService().parseUsageFromRateLimitHeaders(response)
+        XCTAssertTrue(usage.weeklyResetIsFromAPI)
+        XCTAssertEqual(usage.weeklyResetTime.timeIntervalSince1970, resetEpoch, accuracy: 0.5)
+    }
+
+    func testHeadersWithoutSevenDayResetClearFlag() throws {
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: URL(string: "https://claude.ai/api/usage")!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["anthropic-ratelimit-unified-7d-utilization": "0.2"]
+        ))
+        XCTAssertFalse(makeService().parseUsageFromRateLimitHeaders(response).weeklyResetIsFromAPI)
+    }
+}

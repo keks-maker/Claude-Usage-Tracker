@@ -269,6 +269,45 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertEqual(usage.creditsUnlimited, true)
     }
 
+    func testMapToUsageWeeklyResetFromAPISetsFlag() throws {
+        let response = try decodeResponse("""
+        {"rate_limit": {"secondary_window": {"used_percent": 17, "reset_at": 1789500000, "limit_window_seconds": 604800}}}
+        """)
+        XCTAssertTrue(CodexAPIService.mapToUsage(response).weeklyResetIsFromAPI)
+    }
+
+    func testMapToUsageWeeklyResetFallbackClearsFlag() throws {
+        let response = try decodeResponse("""
+        {"rate_limit": {"secondary_window": {"used_percent": 17, "limit_window_seconds": 604800}}}
+        """)
+        XCTAssertFalse(CodexAPIService.mapToUsage(response).weeklyResetIsFromAPI)
+    }
+
+    func testCodexUsageWithAPIResetRecordsDailySnapshot() throws {
+        // A Codex usage with a real weekly reset must be written as a day snapshot
+        let response = try decodeResponse("""
+        {"rate_limit": {"secondary_window": {"used_percent": 17, "reset_at": 1789500000, "limit_window_seconds": 604800}}}
+        """)
+        let usage = CodexAPIService.mapToUsage(response)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Berlin")!
+
+        let suite = "CodexWeeklyDailySnapshotTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        let profileId = UUID()
+        // Three days before the reset, same time of day: inside the window and on a column
+        let now = Date(timeIntervalSince1970: 1789500000 - 3 * 24 * 60 * 60)
+        store.recordUsage(usage, for: profileId, now: now, calendar: calendar)
+
+        let stored = store.snapshots(for: profileId)
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.endPercentage, 17)
+    }
+
     func testMapToUsageMissingWeeklyGivesZeroPercent() throws {
         let response = try decodeResponse("""
         {"rate_limit": {"primary_window": {"used_percent": 99, "reset_at": 1789000000, "limit_window_seconds": 18000}}}

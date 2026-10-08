@@ -166,6 +166,7 @@ final class CodexAPIService {
         }
 
         usage.weeklyPercentage = weekly?.usedPercent ?? 0
+        usage.weeklyResetIsFromAPI = weekly?.resetDate != nil
         if let weeklyReset = weekly?.resetDate {
             usage.weeklyResetTime = weeklyReset
         } else if let previousReset = previous?.weeklyResetTime, previousReset > Date() {

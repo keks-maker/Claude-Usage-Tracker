@@ -35,14 +35,20 @@ enum WeeklyDailyUsage {
 
     /// Local start-of-day dates for the 7 columns of the weekly breakdown, oldest first.
     ///
-    /// The columns end with the calendar day of the reset, so the current day is
-    /// always among them (the reset day included, before the reset time). Because
-    /// the window is 7 x 24 h and not aligned to midnight, the first column starts
-    /// one day after the weekday of `weekStart(for:)`; the part of that first
-    /// weekday that lies inside the window is not shown.
+    /// The columns end with the calendar day of the reset (the reset day included,
+    /// before the reset time). Because the window is 7 x 24 h and not aligned to
+    /// midnight, the first column starts one day after the weekday of
+    /// `weekStart(for:)`. Observations on that weekday have no column and are not
+    /// stored (see `applying`).
     static func dayStarts(weeklyResetTime: Date, calendar: Calendar) -> [Date] {
         let lastDay = calendar.startOfDay(for: weeklyResetTime)
         return (0..<7).reversed().compactMap { calendar.date(byAdding: .day, value: -$0, to: lastDay) }
+    }
+
+    /// True if `now` falls on one of the columns of the weekly breakdown.
+    static func isInColumns(_ now: Date, weeklyResetTime: Date, calendar: Calendar) -> Bool {
+        dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+            .contains { calendar.isDate($0, inSameDayAs: now) }
     }
 
     /// True if both reset times belong to the same weekly window.
@@ -54,8 +60,11 @@ enum WeeklyDailyUsage {
 
     /// Applies one observation to the stored snapshots and returns the new list.
     ///
-    /// - An observation outside the current window (stale or missing reset time)
-    ///   returns the stored snapshots unchanged, so nothing is ever discarded by it.
+    /// - An observation outside the current window (stale or missing reset time),
+    ///   or on a day without a column, returns the stored snapshots unchanged, so
+    ///   nothing is ever discarded by it. Accepting only observations on a column
+    ///   day keeps every stored value visible; the first weekday of the window has
+    ///   no column and is therefore not recorded.
     /// - Snapshots of a different weekly window are discarded only by a valid
     ///   observation, i.e. when a new week really starts.
     /// - The day's entry is created on the first observation of the day and its
@@ -69,7 +78,8 @@ enum WeeklyDailyUsage {
     ) -> [DailyWeeklySnapshot] {
         guard percentage.isFinite,
               now >= weekStart(for: weeklyResetTime),
-              now < weeklyResetTime else {
+              now < weeklyResetTime,
+              isInColumns(now, weeklyResetTime: weeklyResetTime, calendar: calendar) else {
             return existing
         }
 
