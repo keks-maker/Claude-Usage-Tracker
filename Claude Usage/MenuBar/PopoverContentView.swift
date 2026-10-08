@@ -631,11 +631,11 @@ struct SmartUsageDashboard: View {
         SharedDataStore.shared.loadPopoverTimeDisplay()
     }
 
-    /// End of today's daily budget on the weekly bar; only with a profile and a valid open weekly window
-    private var todayBudgetEnd: WeeklyDailyUsage.BudgetEnd? {
+    /// End of each remaining day's budget on the weekly bar; only with a profile and a valid open weekly window
+    private var dayMarkers: [WeeklyDayMarker] {
         let reset = usage.weeklyResetTime
-        guard let profileId, reset > Date() else { return nil }
-        return WeeklyDailyUsage.todayBudgetEnd(
+        guard let profileId, reset > Date() else { return [] }
+        return WeeklyDayMarker.markers(
             snapshots: WeeklyDailySnapshotStore.shared.snapshots(for: profileId),
             currentWeeklyPercentage: usage.weeklyPercentage,
             now: Date(),
@@ -686,7 +686,7 @@ struct SmartUsageDashboard: View {
                 showPaceMarker: showPaceMarker,
                 usePaceColoring: usePaceColoring,
                 timeDisplay: timeDisplay,
-                budgetEnd: todayBudgetEnd
+                dayMarkers: dayMarkers
             )
 
             WeeklyDailyBreakdownView(
@@ -813,12 +813,11 @@ struct UsageRow: View {
     var showPaceMarker: Bool = true
     var usePaceColoring: Bool = true
     var timeDisplay: PopoverTimeDisplay = .resetTime
-    /// End of today's daily budget on the weekly scale (weekly row only)
-    var budgetEnd: WeeklyDailyUsage.BudgetEnd? = nil
+    /// Budget ends of today and the remaining days on the weekly scale (weekly row only)
+    var dayMarkers: [WeeklyDayMarker] = []
 
-    private var budgetEndFraction: CGFloat? {
-        guard let budgetEnd else { return nil }
-        let f = min(1, max(0, budgetEnd.percentage / 100))
+    private func markerFraction(_ marker: WeeklyDayMarker) -> CGFloat {
+        let f = min(1, max(0, marker.percentage / 100))
         return CGFloat(showRemaining ? 1 - f : f)
     }
 
@@ -927,13 +926,16 @@ struct UsageRow: View {
                     }
                 }
                 .overlay(alignment: .leading) {
-                    // Today's daily budget ends here; dimmer when the day start value is only estimated
-                    if let fraction = budgetEndFraction {
+                    // Each day's budget ends here, in the color of its column; dimmer when only estimated
+                    ForEach(Array(dayMarkers.enumerated()), id: \.offset) { _, marker in
                         RoundedRectangle(cornerRadius: 1)
-                            .fill(Color(nsColor: .labelColor).opacity(budgetEnd?.isEstimated == true ? 0.35 : 0.8))
-                            .frame(width: 1.5, height: 8)
-                            .offset(x: round(geometry.size.width * fraction) - 0.75)
-                            .help("popover.daily_budget.end_marker".localized(with: formatEnd))
+                            .fill(marker.color.opacity(marker.isEstimated ? 0.4 : 1))
+                            .frame(width: 2, height: 9)
+                            .offset(x: round(geometry.size.width * markerFraction(marker)) - 1)
+                            .help("popover.daily_budget.day_marker".localized(
+                                with: marker.weekdayName,
+                                formatEnd(marker)
+                            ))
                     }
                 }
             }
@@ -954,10 +956,9 @@ struct UsageRow: View {
         )
     }
 
-    private var formatEnd: String {
-        let value = budgetEnd?.percentage ?? 0
-        let text = value.formatted(.number.precision(.fractionLength(0)))
-        return budgetEnd?.isEstimated == true ? "~\(text)" : text
+    private func formatEnd(_ marker: WeeklyDayMarker) -> String {
+        let text = marker.percentage.formatted(.number.precision(.fractionLength(0)))
+        return marker.isEstimated ? "~\(text)" : text
     }
 
     private func resetTimeText(for reset: Date) -> String {

@@ -8,6 +8,62 @@
 
 import SwiftUI
 
+/// One color per column of the weekly breakdown (oldest day first). The column and its marker on the
+/// weekly bar share it. System colors adapt to light and dark mode; orange is left out because it
+/// signals an exceeded budget. The weekday label under each column keeps the day readable without color.
+enum WeeklyDayPalette {
+    private static let colors: [Color] = [.blue, .teal, .green, .indigo, .purple, .pink, .brown]
+
+    static func color(for columnIndex: Int) -> Color {
+        colors[((columnIndex % colors.count) + colors.count) % colors.count]
+    }
+
+    /// Full weekday name for tooltips
+    static func weekdayName(_ day: Date) -> String {
+        weekdayNameFormatter.string(from: day)
+    }
+
+    private static let weekdayNameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return formatter
+    }()
+}
+
+/// Budget end of one day, drawn on the weekly bar
+struct WeeklyDayMarker: Equatable {
+    let weekdayName: String
+    let percentage: Double
+    let isEstimated: Bool
+    let color: Color
+
+    /// Markers for the days of the current weekly window (nothing for past days).
+    static func markers(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> [WeeklyDayMarker] {
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        return WeeklyDailyUsage.columnMarkers(
+            snapshots: snapshots,
+            currentWeeklyPercentage: currentWeeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ).compactMap { marker in
+            guard let marker, days.indices.contains(marker.columnIndex) else { return nil }
+            return WeeklyDayMarker(
+                weekdayName: WeeklyDayPalette.weekdayName(days[marker.columnIndex]),
+                percentage: marker.percentage,
+                isEstimated: marker.isEstimated,
+                color: WeeklyDayPalette.color(for: marker.columnIndex)
+            )
+        }
+    }
+}
+
 struct WeeklyDailyBreakdownView: View {
     let profileId: UUID?
     let weeklyPercentage: Double
@@ -45,6 +101,13 @@ struct WeeklyDailyBreakdownView: View {
         )
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
         let todayColumn = todayIndex.map { columns[$0] }
+        let todayLimit = WeeklyDailyUsage.columnMarkers(
+            snapshots: snapshots,
+            currentWeeklyPercentage: weeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )[safe: todayIndex]
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .bottom, spacing: 4) {
@@ -56,7 +119,8 @@ struct WeeklyDailyBreakdownView: View {
                         day: days[index],
                         remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
                         isOverBudget: isOverBudget(usage: usage, budget: dayBudget),
-                        isToday: isToday
+                        isToday: isToday,
+                        color: WeeklyDayPalette.color(for: index)
                     )
                 }
             }
@@ -64,8 +128,7 @@ struct WeeklyDailyBreakdownView: View {
 
             if let todayColumn, let usage = todayColumn.usage, let budget = todayColumn.budget {
                 let remaining = WeeklyDailyUsage.todayRemaining(usage: usage, budget: budget)
-                let key = todayColumn.isEstimated ? "popover.daily_budget.today_estimated" : "popover.daily_budget.today"
-                Text(key.localized(with: formatPoints(remaining), formatPoints(budget)))
+                Text(todayText(remaining: remaining, budget: budget, limit: todayLimit ?? nil, isEstimated: todayColumn.isEstimated))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -81,13 +144,27 @@ struct WeeklyDailyBreakdownView: View {
         return WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: usage, budget: budget)
     }
 
+    /// "today: x left of y · limit at z"; without a limit (budget 0) only the first part
+    private func todayText(remaining: Double, budget: Double, limit: WeeklyDailyUsage.ColumnMarker?, isEstimated: Bool) -> String {
+        if let limit {
+            let key = isEstimated ? "popover.daily_budget.today_limit_estimated" : "popover.daily_budget.today_limit"
+            return key.localized(
+                with: formatPoints(remaining),
+                formatPoints(budget),
+                limit.percentage.formatted(.number.precision(.fractionLength(0)))
+            )
+        }
+        let key = isEstimated ? "popover.daily_budget.today_estimated" : "popover.daily_budget.today"
+        return key.localized(with: formatPoints(remaining), formatPoints(budget))
+    }
+
     private func formatPoints(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
-    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool) -> some View {
+    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool, color: Color) -> some View {
         VStack(spacing: 2) {
-            budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget)
+            budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget, color: color)
                 .frame(maxWidth: .infinity, maxHeight: barAreaHeight)
 
             Text(Self.weekdayFormatter.string(from: day))
@@ -111,8 +188,8 @@ struct WeeklyDailyBreakdownView: View {
     /// Frame = daily budget (full height). Fill = budget still left, emptying from the top as usage grows.
     /// Dashed frame without fill when the day has no data or no budget is known.
     /// A budget of 0 gives a solid, empty frame (already used up).
-    private func budgetBar(remainingFraction: Double?, isOverBudget: Bool) -> some View {
-        let frameColor = isOverBudget ? Color.orange : Color.secondary
+    private func budgetBar(remainingFraction: Double?, isOverBudget: Bool, color: Color) -> some View {
+        let frameColor = isOverBudget ? Color.orange : color
         return ZStack(alignment: .bottom) {
             RoundedRectangle(cornerRadius: 2)
                 .stroke(
@@ -122,9 +199,17 @@ struct WeeklyDailyBreakdownView: View {
 
             if let remainingFraction, remainingFraction > 0 {
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(isOverBudget ? Color.orange : Color.accentColor)
+                    .fill(isOverBudget ? Color.orange : color.opacity(0.85))
                     .frame(height: max(1, barAreaHeight * CGFloat(remainingFraction)))
             }
         }
+    }
+}
+
+private extension Array {
+    /// Element at an optional index, `nil` if the index is nil or out of range
+    subscript(safe index: Int?) -> Element? {
+        guard let index, indices.contains(index) else { return nil }
+        return self[index]
     }
 }

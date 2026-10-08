@@ -730,4 +730,69 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let end = WeeklyDailyUsage.todayBudgetEnd(snapshots: snaps, currentWeeklyPercentage: 75, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(end?.percentage ?? -1, 100, accuracy: 0.0001)
     }
+
+    // MARK: - Column Markers
+
+    func testColumnMarkers_cumulateRestBudgetAfterToday() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 10, end: 20)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 25, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(markers.count, 7)
+        // Past days (Tue, Wed): no marker
+        XCTAssertNil(markers[0])
+        XCTAssertNil(markers[1])
+        // Today (Thu): day start 20 + (100 - 20) / 5
+        XCTAssertEqual(markers[2]?.percentage ?? -1, 36, accuracy: 0.0001)
+        XCTAssertEqual(markers[2]?.columnIndex, 2)
+        XCTAssertEqual(markers[2]?.isEstimated, false)
+        // Fri-Mon: 25 + k * (75 / 4)
+        XCTAssertEqual(markers[3]?.percentage ?? -1, 43.75, accuracy: 0.0001)
+        XCTAssertEqual(markers[4]?.percentage ?? -1, 62.5, accuracy: 0.0001)
+        XCTAssertEqual(markers[5]?.percentage ?? -1, 81.25, accuracy: 0.0001)
+        XCTAssertEqual(markers[6]?.percentage ?? -1, 100, accuracy: 0.0001)
+        XCTAssertEqual(markers[6]?.isEstimated, false)
+    }
+
+    func testColumnMarkers_todayEstimatedWithoutEarlierDay() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: [], currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(markers[2]?.percentage ?? -1, 52, accuracy: 0.0001)
+        XCTAssertEqual(markers[2]?.isEstimated, true)
+        // Future days do not depend on the baseline
+        XCTAssertEqual(markers[3]?.isEstimated, false)
+    }
+
+    func testColumnMarkers_lastDayEndsAt100() {
+        // Reset day: no later days, only today's marker, exactly 100
+        let now = Self.date(2026, 10, 12, 9, 0)
+        let snaps = [snapshot(2026, 10, 11, start: 50, end: 70)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 75, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(markers[6]?.percentage ?? -1, 100, accuracy: 0.0001)
+        XCTAssertEqual(markers.compactMap { $0 }.count, 1)
+    }
+
+    func testColumnMarkers_neverAbove100() {
+        let now = Self.date(2026, 10, 7, 13, 0)
+        let snaps = [snapshot(2026, 10, 6, start: 0, end: 99)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 99.5, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertTrue(markers.compactMap { $0 }.allSatisfy { $0.percentage <= 100 })
+    }
+
+    func testColumnMarkers_noMarkersWhenBudgetIsZero() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 90, end: 100)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 100, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(markers.count, 7)
+        XCTAssertTrue(markers.allSatisfy { $0 == nil })
+    }
+
+    func testColumnMarkers_nilWhenOutsideColumnsOrInvalidValue() {
+        let before = Self.date(2026, 10, 5, 13, 0)
+        let outside = WeeklyDailyUsage.columnMarkers(snapshots: [], currentWeeklyPercentage: 10, now: before, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(outside.count, 7)
+        XCTAssertTrue(outside.allSatisfy { $0 == nil })
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let invalid = WeeklyDailyUsage.columnMarkers(snapshots: [], currentWeeklyPercentage: .nan, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertTrue(invalid.allSatisfy { $0 == nil })
+    }
 }

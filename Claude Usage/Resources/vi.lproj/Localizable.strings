@@ -76,7 +76,9 @@
 "menubar.weekly" = "Hàng tuần";
 "popover.daily_budget.today" = "hôm nay: còn %@%% trên %@%%";
 "popover.daily_budget.today_estimated" = "hôm nay: còn khoảng %@%% trên %@%%";
-"popover.daily_budget.end_marker" = "ngân sách hôm nay kết thúc ở %@%%";
+"popover.daily_budget.today_limit" = "hôm nay: còn %@%% trên %@%% · giới hạn ở %@%%";
+"popover.daily_budget.today_limit_estimated" = "hôm nay: còn khoảng %@%% trên %@%% · giới hạn ở ~%@%%";
+"popover.daily_budget.day_marker" = "%@: kết thúc ở %@%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Đã dùng";
 "menubar.remaining" = "Còn lại";

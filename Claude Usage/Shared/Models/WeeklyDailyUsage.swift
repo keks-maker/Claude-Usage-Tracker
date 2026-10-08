@@ -355,6 +355,81 @@ enum WeeklyDailyUsage {
         )
     }
 
+    // MARK: - Column Markers
+
+    /// End of one day's budget on the weekly scale, for the marker of that column.
+    struct ColumnMarker: Equatable {
+        /// Index into `dayStarts`
+        let columnIndex: Int
+        /// Weekly percentage (0 to 100) at which this day's budget is used up
+        let percentage: Double
+        /// True if the value is only an estimate (today with an unreliable baseline)
+        let isEstimated: Bool
+    }
+
+    /// Budget end markers per column, aligned with `dayStarts`.
+    ///
+    /// Cumulation (all values on the weekly scale, capped at 100):
+    /// - Past days: `nil`, no marker.
+    /// - Today: `todayBudgetEnd` (day start value + today's budget).
+    /// - Day k after today (k = 1...n): current weekly value + k * `restDailyBudget`.
+    ///   This uses the same per-day budget as the columns of those days, so marker and
+    ///   column always agree, and the last day ends exactly at 100.
+    ///   Because the future markers start from the live value and today's marker from the
+    ///   day start value, a day that stays under its budget moves the later markers to
+    ///   the right of what the day start plan said (the saved allowance is spread over
+    ///   the remaining days).
+    /// - A day with a budget of 0 has no marker (nothing to mark).
+    /// `nil` for all columns if `now` is not on a column or the live value is invalid.
+    static func columnMarkers(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> [ColumnMarker?] {
+        let days = dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        guard isInColumns(now, weeklyResetTime: weeklyResetTime, calendar: calendar),
+              currentWeeklyPercentage.isFinite else {
+            return days.map { _ in nil }
+        }
+        let current = min(100, max(0, currentWeeklyPercentage))
+        let today = calendar.startOfDay(for: now)
+        let todayEnd = todayBudgetEnd(
+            snapshots: snapshots,
+            currentWeeklyPercentage: current,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        let rest = restDailyBudget(
+            currentWeeklyPercentage: current,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+
+        var futureStep = 0
+        return days.indices.map { index in
+            let day = days[index]
+            if calendar.isDate(day, inSameDayAs: today) {
+                return todayEnd.map {
+                    ColumnMarker(columnIndex: index, percentage: $0.percentage, isEstimated: $0.isEstimated)
+                }
+            }
+            if day > today {
+                futureStep += 1
+                guard rest > 0 else { return nil }
+                return ColumnMarker(
+                    columnIndex: index,
+                    percentage: min(100, current + Double(futureStep) * rest),
+                    isEstimated: false
+                )
+            }
+            return nil
+        }
+    }
+
     // MARK: - Daily Budget
 
     /// Number of calendar days until the weekly reset, at least 1.
