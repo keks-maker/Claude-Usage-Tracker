@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Daily breakdown of weekly usage** in the popover: seven columns (one per day of the weekly window) show the usage consumed per day, with a daily budget line `(100 % − current weekly usage) / days until reset` and today's value highlighted. Per-day values come from snapshots stored per profile in UserDefaults; days without data are shown as empty, not as 0.
+- **Daily budget breakdown of weekly usage** in the popover: the weekly quota is split into daily budgets, `(100 % − weekly usage at the start of the day) / days left including today` (e.g. 39 % used → 61 / 5 = 12.2 % per day).
+  - Seven columns (one per day of the weekly window): each frame is that day's budget, the fill is what is left of it and drains as you use it. Today is outlined; days after today are filled with their planned budget; past days without data are dashed, not shown as 0.
+  - A text line under the columns shows today's remaining budget and the limit on the weekly scale ("today: 11.2 % left of 12.2 % · limit at 52 %"). Without a measurement from the start of the day (e.g. first launch) the budget is estimated from the current value and marked "ca."/"~".
+  - Every day has its own colour; a marker of the same colour on the weekly bar shows where that day's budget ends (tooltip: weekday and percentage). Future budgets form one chain from today's limit up to 100 %; unused budget is redistributed over the remaining days the next day, overspending lowers them immediately.
+  - A notification (once per day and profile) fires as soon as today's usage reaches the daily budget.
+  - Per-day values come from snapshots stored per profile in UserDefaults; deleting a profile removes them. New strings are localized in all 14 languages.
 
 ## [3.3.0] - 2026-08-29
 
