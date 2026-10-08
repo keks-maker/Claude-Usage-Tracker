@@ -690,4 +690,44 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(cols[6].usage ?? -1, 3, accuracy: 0.0001)
         XCTAssertFalse(cols[6].isEstimated)
     }
+
+    // MARK: - Budget End Marker
+
+    func testTodayBudgetEnd_isDayStartPlusBudget() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 10, end: 20)]
+        let end = WeeklyDailyUsage.todayBudgetEnd(snapshots: snaps, currentWeeklyPercentage: 25, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        // 5 days incl. today, (100 - 20) / 5 = 16 -> 20 + 16
+        XCTAssertEqual(end?.percentage ?? -1, 36, accuracy: 0.0001)
+        XCTAssertEqual(end?.isEstimated, false)
+    }
+
+    func testTodayBudgetEnd_estimatedWithoutEarlierDay() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let end = WeeklyDailyUsage.todayBudgetEnd(snapshots: [], currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        // Baseline = live value 40, (100 - 40) / 5 = 12
+        XCTAssertEqual(end?.percentage ?? -1, 52, accuracy: 0.0001)
+        XCTAssertEqual(end?.isEstimated, true)
+    }
+
+    func testTodayBudgetEnd_nilWhenBudgetIsZero() {
+        let now = Self.date(2026, 10, 8, 13, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 90, end: 100)]
+        XCTAssertNil(WeeklyDailyUsage.todayBudgetEnd(snapshots: snaps, currentWeeklyPercentage: 100, now: now, weeklyResetTime: resetTime, calendar: calendar))
+    }
+
+    func testTodayBudgetEnd_nilOutsideColumnsOrForInvalidValue() {
+        let before = Self.date(2026, 10, 5, 13, 0)
+        XCTAssertNil(WeeklyDailyUsage.todayBudgetEnd(snapshots: [], currentWeeklyPercentage: 10, now: before, weeklyResetTime: resetTime, calendar: calendar))
+        let now = Self.date(2026, 10, 8, 13, 0)
+        XCTAssertNil(WeeklyDailyUsage.todayBudgetEnd(snapshots: [], currentWeeklyPercentage: .nan, now: now, weeklyResetTime: resetTime, calendar: calendar))
+    }
+
+    func testTodayBudgetEnd_cappedAt100() {
+        // Reset day: 1 day left, budget = everything left, so the end is exactly 100
+        let now = Self.date(2026, 10, 12, 9, 0)
+        let snaps = [snapshot(2026, 10, 11, start: 50, end: 70)]
+        let end = WeeklyDailyUsage.todayBudgetEnd(snapshots: snaps, currentWeeklyPercentage: 75, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(end?.percentage ?? -1, 100, accuracy: 0.0001)
+    }
 }

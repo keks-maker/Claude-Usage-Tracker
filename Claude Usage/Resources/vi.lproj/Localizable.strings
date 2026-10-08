@@ -76,6 +76,7 @@
 "menubar.weekly" = "Hàng tuần";
 "popover.daily_budget.today" = "hôm nay: còn %@%% trên %@%%";
 "popover.daily_budget.today_estimated" = "hôm nay: còn khoảng %@%% trên %@%%";
+"popover.daily_budget.end_marker" = "ngân sách hôm nay kết thúc ở %@%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Đã dùng";
 "menubar.remaining" = "Còn lại";

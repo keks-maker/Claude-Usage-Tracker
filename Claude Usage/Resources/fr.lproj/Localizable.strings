@@ -70,6 +70,7 @@
 "menubar.weekly" = "Hebdomadaire";
 "popover.daily_budget.today" = "aujourd’hui : reste %@ %% sur %@ %%";
 "popover.daily_budget.today_estimated" = "aujourd’hui : reste env. %@ %% sur %@ %%";
+"popover.daily_budget.end_marker" = "le budget du jour se termine à %@ %%";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilisé";
 "menubar.remaining" = "Restant";

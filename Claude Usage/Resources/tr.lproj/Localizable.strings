@@ -76,6 +76,7 @@
 "menubar.weekly" = "Haftalık";
 "popover.daily_budget.today" = "bugün: kalan %@%% / %@%%";
 "popover.daily_budget.today_estimated" = "bugün: yaklaşık kalan %@%% / %@%%";
+"popover.daily_budget.end_marker" = "bugünkü bütçe %@%% noktasında biter";
 "menubar.anthropic_console" = "Anthropic API Konsolu";
 "menubar.used" = "Kullanılan";
 "menubar.remaining" = "Kalan";

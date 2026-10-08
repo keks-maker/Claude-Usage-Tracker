@@ -307,6 +307,54 @@ enum WeeklyDailyUsage {
         }
     }
 
+    // MARK: - Budget End Marker
+
+    /// Where today's daily budget ends on the weekly scale.
+    struct BudgetEnd: Equatable {
+        /// Weekly percentage (0 to 100) at which today's budget is used up: day start value + today's budget
+        let percentage: Double
+        /// True if the day start value is only an estimate (see `isTodayBaselineReliable`)
+        let isEstimated: Bool
+    }
+
+    /// End of today's budget on the weekly scale, for a marker on the weekly bar.
+    /// `nil` if `now` is not on a column, the live value is invalid or today's budget is 0
+    /// (then there is no budget to mark).
+    static func todayBudgetEnd(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> BudgetEnd? {
+        guard isInColumns(now, weeklyResetTime: weeklyResetTime, calendar: calendar),
+              currentWeeklyPercentage.isFinite else { return nil }
+        let current = min(100, max(0, currentWeeklyPercentage))
+        let budget = todayBudget(
+            snapshots: snapshots,
+            currentWeeklyPercentage: current,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        guard budget > 0 else { return nil }
+        let start = todayBaseline(
+            snapshots: snapshots,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ) ?? current
+        return BudgetEnd(
+            percentage: min(100, max(0, start) + budget),
+            isEstimated: !isTodayBaselineReliable(
+                snapshots: snapshots,
+                now: now,
+                weeklyResetTime: weeklyResetTime,
+                calendar: calendar
+            )
+        )
+    }
+
     // MARK: - Daily Budget
 
     /// Number of calendar days until the weekly reset, at least 1.

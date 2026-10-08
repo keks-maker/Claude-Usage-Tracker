@@ -70,6 +70,7 @@
 "menubar.weekly" = "週次";
 "popover.daily_budget.today" = "今日: 残り %@%%（目安 %@%%）";
 "popover.daily_budget.today_estimated" = "今日: 残り約 %@%%（目安 約%@%%）";
+"popover.daily_budget.end_marker" = "今日の予算の終点: %@%%";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";

@@ -71,6 +71,7 @@
 "menubar.weekly" = "每周";
 "popover.daily_budget.today" = "今日：剩余 %@%%，预算 %@%%";
 "popover.daily_budget.today_estimated" = "今日：约剩余 %@%%，预算约 %@%%";
+"popover.daily_budget.end_marker" = "今日预算终点：%@%%";
 "menubar.anthropic_console" = "Anthropic API 控制台";
 "menubar.api_cost" = "API 费用";
 "menubar.cost_source.api" = "API";

@@ -79,6 +79,7 @@
 "menubar.weekly" = "주간";
 "popover.daily_budget.today" = "오늘: 남은 %@%% / 예산 %@%%";
 "popover.daily_budget.today_estimated" = "오늘: 남은 약 %@%% / 예산 약 %@%%";
+"popover.daily_budget.end_marker" = "오늘 예산 종료 지점: %@%%";
 "menubar.anthropic_console" = "Anthropic API 콘솔";
 "menubar.used" = "사용됨";
 "menubar.remaining" = "남음";
