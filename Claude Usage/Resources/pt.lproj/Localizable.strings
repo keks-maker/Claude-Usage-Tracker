@@ -67,7 +67,7 @@
 "menubar.all_models" = "Todos os modelos";
 "menubar.weekly" = "Semanal";
 "popover.daily_budget.today" = "hoje: resta %@%% de %@%%";
-"popover.daily_budget.no_data" = "ainda sem dados";
+"popover.daily_budget.today_estimated" = "hoje: resta aprox. %@%% de %@%%";
 "menubar.anthropic_console" = "Console da API Anthropic";
 "menubar.used" = "Usado";
 "menubar.remaining" = "Restante";

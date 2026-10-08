@@ -75,7 +75,7 @@
 "menubar.all_models" = "Всі моделі";
 "menubar.weekly" = "Тижневе";
 "popover.daily_budget.today" = "сьогодні: залишок %@%% з %@%%";
-"popover.daily_budget.no_data" = "даних ще немає";
+"popover.daily_budget.today_estimated" = "сьогодні: залишок бл. %@%% з %@%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Використано";
 "menubar.remaining" = "Залишилось";

@@ -70,7 +70,7 @@
 "menubar.all_models" = "所有模型";
 "menubar.weekly" = "每周";
 "popover.daily_budget.today" = "今日：剩余 %@%%，预算 %@%%";
-"popover.daily_budget.no_data" = "暂无数据";
+"popover.daily_budget.today_estimated" = "今日：约剩余 %@%%，预算约 %@%%";
 "menubar.anthropic_console" = "Anthropic API 控制台";
 "menubar.api_cost" = "API 费用";
 "menubar.cost_source.api" = "API";

@@ -267,11 +267,15 @@ enum WeeklyDailyUsage {
     struct ColumnValue: Equatable {
         let usage: Double?
         let budget: Double?
+        /// True if the budget is only an estimate (today without an earlier day's snapshot).
+        var isEstimated: Bool = false
     }
 
     /// Usage and budget per column, aligned with `dayStarts`.
     /// - Past days: stored usage and stored budget.
-    /// - Today: live usage and today's budget, both `nil` while the baseline is unreliable.
+    /// - Today: live usage and today's budget. While the baseline is unreliable the first value of
+    ///   the day stands in for the day start, so the budget is an estimate (`isEstimated`) and the
+    ///   measured usage is a lower bound.
     /// - Days after today: usage 0 and `restDailyBudget`, which depends only on the current
     ///   weekly value, never on the baseline. They are therefore always known.
     ///   (`restDailyBudget` spreads the allowance left now over the calendar days after today.)
@@ -294,7 +298,7 @@ enum WeeklyDailyUsage {
         return days.indices.map { index in
             let day = days[index]
             if calendar.isDate(day, inSameDayAs: today) {
-                return ColumnValue(usage: reliable ? live : nil, budget: reliable ? todayB : nil)
+                return ColumnValue(usage: live, budget: todayB, isEstimated: !reliable)
             }
             if day > today {
                 return ColumnValue(usage: 0, budget: rest)

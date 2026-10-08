@@ -600,8 +600,10 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let now = Self.date(2026, 10, 8, 12, 0)
         let cols = WeeklyDailyUsage.columnValues(snapshots: [], currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(cols.count, 7)
-        XCTAssertNil(cols[2].usage)   // Thu = today
-        XCTAssertNil(cols[2].budget)
+        // Thu = today: budget estimated from the current value, (100 - 39) / 5
+        XCTAssertEqual(cols[2].usage ?? -1, 0, accuracy: 0.0001)
+        XCTAssertEqual(cols[2].budget ?? -1, 12.2, accuracy: 0.0001)
+        XCTAssertTrue(cols[2].isEstimated)
         for index in 3...6 {          // Fri ... Mon
             XCTAssertEqual(cols[index].usage, 0)
             XCTAssertEqual(cols[index].budget ?? -1, 15.25, accuracy: 0.0001)
@@ -625,7 +627,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: 0), 0)
     }
 
-    func testDailyBudgetAlert_estimatedBaselineDoesNotFire() {
+    func testDailyBudgetAlert_estimatedBaselineFiresOnce() {
         let suite = "DailyBudgetAlertEstimatedTests"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -642,13 +644,50 @@ final class WeeklyDailyUsageTests: XCTestCase {
         var usage = ClaudeUsage.empty
         usage.weeklyResetTime = resetTime
         usage.weeklyResetIsFromAPI = true
-        // No snapshot of an earlier day: first fetch at 39 %, later 80 % would exceed any budget
-        for (pct, hour) in [(39.0, 9), (80.0, 12)] {
+        // No snapshot of an earlier day: first fetch at 39 % gives an estimated budget of 12.2,
+        // measured usage is a lower bound, so 80 % alerts once
+        var results: [Bool] = []
+        for (pct, hour) in [(39.0, 9), (45.0, 10), (80.0, 12), (85.0, 13)] {
             let now = Self.date(2026, 10, 8, hour, 0)
             store.record(percentage: pct, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
             usage.weeklyPercentage = pct
-            XCTAssertFalse(service.checkAndNotify(usage: usage, profileId: profileId, profileName: "Test", settings: settings, now: now, calendar: calendar))
+            results.append(service.checkAndNotify(usage: usage, profileId: profileId, profileName: "Test", settings: settings, now: now, calendar: calendar))
         }
-        XCTAssertEqual(dispatched, 0)
+        XCTAssertEqual(results, [false, false, true, false])
+        XCTAssertEqual(dispatched, 1)
+    }
+
+    func testColumnValues_estimatedTodayGrowsWithUsageAndKeepsBudget() {
+        // Snapshot of today exists (first value 40 %), no earlier day: budget (100 - 40) / 5 = 12
+        let now = Self.date(2026, 10, 8, 15, 0)
+        let snaps = [snapshot(2026, 10, 8, start: 40, end: 40)]
+        let cols = WeeklyDailyUsage.columnValues(snapshots: snaps, currentWeeklyPercentage: 43, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(cols[2].budget ?? -1, 12, accuracy: 0.0001)
+        XCTAssertEqual(cols[2].usage ?? -1, 3, accuracy: 0.0001)
+        XCTAssertTrue(cols[2].isEstimated)
+    }
+
+    func testColumnValues_todayWithReliableBaselineAndPastStoredBudget() {
+        // Wed ended at 39 % with stored budget 10; Thu is reliable: (100 - 39) / 5 = 12.2
+        let now = Self.date(2026, 10, 8, 12, 0)
+        var wed = snapshot(2026, 10, 7, start: 30, end: 39)
+        wed.dailyBudget = 10
+        let cols = WeeklyDailyUsage.columnValues(snapshots: [wed], currentWeeklyPercentage: 45, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(cols[1].budget, 10)
+        XCTAssertEqual(cols[1].usage ?? -1, 9, accuracy: 0.0001)   // first stored day: own start is the baseline
+        XCTAssertEqual(cols[2].budget ?? -1, 12.2, accuracy: 0.0001)
+        XCTAssertEqual(cols[2].usage ?? -1, 6, accuracy: 0.0001)
+        XCTAssertFalse(cols[2].isEstimated)
+        XCTAssertNil(cols[0].usage)
+    }
+
+    func testColumnValues_todayIsResetDay() {
+        // Monday 10:00, reset 12:59 the same day: one day remains incl. today
+        let now = Self.date(2026, 10, 12, 10, 0)
+        let snaps = [snapshot(2026, 10, 11, start: 80, end: 90)]
+        let cols = WeeklyDailyUsage.columnValues(snapshots: snaps, currentWeeklyPercentage: 93, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(cols[6].budget ?? -1, 10, accuracy: 0.0001)
+        XCTAssertEqual(cols[6].usage ?? -1, 3, accuracy: 0.0001)
+        XCTAssertFalse(cols[6].isEstimated)
     }
 }

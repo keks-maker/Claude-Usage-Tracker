@@ -44,32 +44,12 @@ struct WeeklyDailyBreakdownView: View {
             calendar: calendar
         )
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
-        let todayUsage = WeeklyDailyUsage.todayUsage(
-            snapshots: snapshots,
-            currentWeeklyPercentage: weeklyPercentage,
-            now: now,
-            weeklyResetTime: weeklyResetTime,
-            calendar: calendar
-        )
-        let baselineReliable = WeeklyDailyUsage.isTodayBaselineReliable(
-            snapshots: snapshots,
-            now: now,
-            weeklyResetTime: weeklyResetTime,
-            calendar: calendar
-        )
-        let budget = WeeklyDailyUsage.todayBudget(
-            snapshots: snapshots,
-            currentWeeklyPercentage: weeklyPercentage,
-            now: now,
-            weeklyResetTime: weeklyResetTime,
-            calendar: calendar
-        )
+        let todayColumn = todayIndex.map { columns[$0] }
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(days.indices, id: \.self) { index in
                     let isToday = index == todayIndex
-                    // Today without a reliable day-start value is unknown; days after today are always known
                     let usage = columns[index].usage
                     let dayBudget = columns[index].budget
                     dayColumn(
@@ -82,15 +62,10 @@ struct WeeklyDailyBreakdownView: View {
             }
             .frame(height: barAreaHeight + 16)
 
-            if todayUsage != nil, !baselineReliable {
-                Text("popover.daily_budget.no_data".localized)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            } else if let todayUsage {
-                let remaining = WeeklyDailyUsage.todayRemaining(usage: todayUsage, budget: budget)
-                Text("popover.daily_budget.today".localized(with: formatPoints(remaining), formatPoints(budget)))
+            if let todayColumn, let usage = todayColumn.usage, let budget = todayColumn.budget {
+                let remaining = WeeklyDailyUsage.todayRemaining(usage: usage, budget: budget)
+                let key = todayColumn.isEstimated ? "popover.daily_budget.today_estimated" : "popover.daily_budget.today"
+                Text(key.localized(with: formatPoints(remaining), formatPoints(budget)))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
