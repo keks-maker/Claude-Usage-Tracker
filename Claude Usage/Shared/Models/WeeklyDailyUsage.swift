@@ -88,13 +88,20 @@ enum WeeklyDailyUsage {
 
         var result = existing.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
         // Today's budget is fixed at the start of the day, so every fetch of the day stores the same value
-        let budget = todayBudget(
+        // With an unreliable baseline (no earlier day) the budget is only an estimate and is not stored,
+        // so the column does not look reliable on a later day
+        let budget: Double? = isTodayBaselineReliable(
+            snapshots: existing,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ) ? todayBudget(
             snapshots: existing,
             currentWeeklyPercentage: percentage,
             now: now,
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
-        )
+        ) : nil
 
         if let index = result.firstIndex(where: { calendar.isDate($0.dayStart, inSameDayAs: now) }) {
             result[index].endPercentage = percentage
@@ -252,6 +259,48 @@ enum WeeklyDailyUsage {
         guard let usage, let budget, usage.isFinite, budget.isFinite, budget >= 0 else { return nil }
         guard budget > 0 else { return 0 }
         return min(1, max(0, (budget - usage) / budget))
+    }
+
+    // MARK: - Column Values
+
+    /// Usage and budget shown for one column of the breakdown.
+    struct ColumnValue: Equatable {
+        let usage: Double?
+        let budget: Double?
+    }
+
+    /// Usage and budget per column, aligned with `dayStarts`.
+    /// - Past days: stored usage and stored budget.
+    /// - Today: live usage and today's budget, both `nil` while the baseline is unreliable.
+    /// - Days after today: usage 0 and `restDailyBudget`, which depends only on the current
+    ///   weekly value, never on the baseline. They are therefore always known.
+    ///   (`restDailyBudget` spreads the allowance left now over the calendar days after today.)
+    static func columnValues(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> [ColumnValue] {
+        let days = dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let usages = dailyUsage(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let stored = storedBudgets(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let reliable = isTodayBaselineReliable(snapshots: snapshots, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let live = todayUsage(snapshots: snapshots, currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let todayB = todayBudget(snapshots: snapshots, currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let rest = restDailyBudget(currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let today = calendar.startOfDay(for: now)
+
+        return days.indices.map { index in
+            let day = days[index]
+            if calendar.isDate(day, inSameDayAs: today) {
+                return ColumnValue(usage: reliable ? live : nil, budget: reliable ? todayB : nil)
+            }
+            if day > today {
+                return ColumnValue(usage: 0, budget: rest)
+            }
+            return ColumnValue(usage: usages[index], budget: stored[index])
+        }
     }
 
     // MARK: - Daily Budget

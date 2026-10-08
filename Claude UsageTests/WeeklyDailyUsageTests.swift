@@ -317,11 +317,11 @@ final class WeeklyDailyUsageTests: XCTestCase {
         // Only today's snapshot exists: its start value is the day start value
         let todayOnly = [snapshot(2026, 10, 8, start: 39, end: 45)]
         XCTAssertEqual(todayBudgetAt(todayOnly, current: 45, 2026, 10, 8, 18), 12.2, accuracy: 0.0001)
-        // First fetch of the day stores that same budget
+        // First fetch ever has an unreliable baseline: no budget is stored
         let stored = WeeklyDailyUsage.applying(
             percentage: 39, at: Self.date(2026, 10, 8, 9, 0), weeklyResetTime: resetTime, to: [], calendar: calendar
         )
-        XCTAssertEqual(stored.first?.dailyBudget ?? -1, 12.2, accuracy: 0.0001)
+        XCTAssertNil(stored.first?.dailyBudget)
     }
 
     func testTodayBudget_wiringWithUsageBarAndRemainder() {
@@ -487,15 +487,16 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let profileId = UUID()
         let now = Self.date(2026, 10, 7, 12, 0)
         store.record(percentage: 39, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
-        store.record(percentage: 50, weeklyResetTime: resetTime, for: profileId, now: now.addingTimeInterval(3600), calendar: calendar)
+        // Thursday: Wednesday's end (39 %) is a reliable baseline, 5 calendar days remaining incl. Thu
+        let thu = Self.date(2026, 10, 8, 9, 0)
+        store.record(percentage: 41, weeklyResetTime: resetTime, for: profileId, now: thu, calendar: calendar)
+        store.record(percentage: 50, weeklyResetTime: resetTime, for: profileId, now: thu.addingTimeInterval(3600), calendar: calendar)
 
-        let stored = store.snapshots(for: profileId)
-        XCTAssertEqual(stored.count, 1)
-        // Day-start budget: Wed starts at 39 % (first value), 6 calendar days remaining incl. Wed.
-        // The later fetch at 50 % does not change it.
-        let dayStartBudget = WeeklyDailyUsage.todayBudget(snapshots: [], currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(stored[0].dailyBudget ?? -1, dayStartBudget, accuracy: 0.0001)
-        XCTAssertEqual(stored[0].dailyBudget ?? -1, 61.0 / 6.0, accuracy: 0.0001)
+        let stored = store.snapshots(for: profileId).sorted { $0.dayStart < $1.dayStart }
+        XCTAssertEqual(stored.count, 2)
+        XCTAssertNil(stored[0].dailyBudget)  // first day: unreliable baseline
+        // The later fetch at 50 % does not change Thursday's day-start budget
+        XCTAssertEqual(stored[1].dailyBudget ?? -1, 61.0 / 5.0, accuracy: 0.0001)
     }
 
     @MainActor
@@ -592,6 +593,30 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let rest = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(rest, 15.25, accuracy: 0.0001)
         XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: rest), 1)
+    }
+
+    func testColumnValues_futureDaysFilledEvenWithUnreliableBaseline() {
+        // Fresh app: no snapshots at all, today (Thu) has an unreliable baseline
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let cols = WeeklyDailyUsage.columnValues(snapshots: [], currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(cols.count, 7)
+        XCTAssertNil(cols[2].usage)   // Thu = today
+        XCTAssertNil(cols[2].budget)
+        for index in 3...6 {          // Fri ... Mon
+            XCTAssertEqual(cols[index].usage, 0)
+            XCTAssertEqual(cols[index].budget ?? -1, 15.25, accuracy: 0.0001)
+            XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: cols[index].usage, budget: cols[index].budget), 1)
+        }
+    }
+
+    func testApplying_unreliableBaselineStoresNoBudget() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let snaps = WeeklyDailyUsage.applying(percentage: 39, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar)
+        XCTAssertEqual(snaps.count, 1)
+        XCTAssertNil(snaps[0].dailyBudget)
+        // Next day has an earlier snapshot, so its budget is stored
+        let next = WeeklyDailyUsage.applying(percentage: 41, at: Self.date(2026, 10, 9, 9, 0), weeklyResetTime: resetTime, to: snaps, calendar: calendar)
+        XCTAssertNotNil(next.first { calendar.isDate($0.dayStart, inSameDayAs: Self.date(2026, 10, 9, 9, 0)) }?.dailyBudget)
     }
 
     func testBudgetZero_isEmptyAndNeverExceeded() {

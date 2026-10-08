@@ -36,8 +36,13 @@ struct WeeklyDailyBreakdownView: View {
     private func breakdown(profileId: UUID, now: Date) -> some View {
         let snapshots = WeeklyDailySnapshotStore.shared.snapshots(for: profileId)
         let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
-        let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
-        let storedBudgets = WeeklyDailyUsage.storedBudgets(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let columns = WeeklyDailyUsage.columnValues(
+            snapshots: snapshots,
+            currentWeeklyPercentage: weeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
         let todayUsage = WeeklyDailyUsage.todayUsage(
             snapshots: snapshots,
@@ -48,12 +53,6 @@ struct WeeklyDailyBreakdownView: View {
         )
         let baselineReliable = WeeklyDailyUsage.isTodayBaselineReliable(
             snapshots: snapshots,
-            now: now,
-            weeklyResetTime: weeklyResetTime,
-            calendar: calendar
-        )
-        let restBudget = WeeklyDailyUsage.restDailyBudget(
-            currentWeeklyPercentage: weeklyPercentage,
             now: now,
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
@@ -70,10 +69,9 @@ struct WeeklyDailyBreakdownView: View {
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(days.indices, id: \.self) { index in
                     let isToday = index == todayIndex
-                    let isFuture = todayIndex.map { index > $0 } ?? false
-                    // Today without a reliable day-start value is unknown, not "nothing used"
-                    let usage: Double? = isToday ? (baselineReliable ? todayUsage : nil) : (isFuture ? 0 : usages[index])
-                    let dayBudget: Double? = isToday ? (baselineReliable ? budget : nil) : (isFuture ? restBudget : storedBudgets[index])
+                    // Today without a reliable day-start value is unknown; days after today are always known
+                    let usage = columns[index].usage
+                    let dayBudget = columns[index].budget
                     dayColumn(
                         day: days[index],
                         remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
