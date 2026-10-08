@@ -521,4 +521,52 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(decoded.startPercentage, 10)
         XCTAssertEqual(decoded.endPercentage, 20)
     }
+
+    // MARK: - Day Budget Bar Fill
+
+    func testDayRemainingFraction_fullWithZeroUsage() {
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: 12.2), 1)
+    }
+
+    func testDayRemainingFraction_halfWithHalfUsed() {
+        XCTAssertEqual(try XCTUnwrap(WeeklyDailyUsage.dayRemainingFraction(usage: 6.1, budget: 12.2)), 0.5, accuracy: 0.0001)
+    }
+
+    func testDayRemainingFraction_zeroWhenUsageReachesOrExceedsBudget() {
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 12.2, budget: 12.2), 0)
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 15, budget: 12.2), 0)
+    }
+
+    func testDayRemainingFraction_nilWithoutUsageBudgetOrPositiveBudget() {
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: nil, budget: 12.2))
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: 3, budget: nil))
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: 3, budget: 0))
+    }
+
+    func testDayRemainingFraction_pastDayUsesStoredBudget() {
+        // Tue 10-06 no data; Wed 10-07 ends at 20; Thu 10-08 goes 20 -> 25 with stored budget 10
+        var thursday = snapshot(2026, 10, 8, start: 20, end: 25)
+        thursday.dailyBudget = 10
+        let snapshots = [snapshot(2026, 10, 7, start: 18, end: 20), thursday]
+
+        let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        let budgets = WeeklyDailyUsage.storedBudgets(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        let fraction = WeeklyDailyUsage.dayRemainingFraction(usage: usages[2], budget: budgets[2])
+        XCTAssertEqual(try XCTUnwrap(fraction), 0.5, accuracy: 0.0001)
+    }
+
+    func testDayRemainingFraction_pastDayWithoutStoredBudgetIsNil() {
+        let snapshots = [snapshot(2026, 10, 7, start: 18, end: 20), snapshot(2026, 10, 8, start: 20, end: 25)]
+        let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        let budgets = WeeklyDailyUsage.storedBudgets(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(usages[2], 5)
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: usages[2], budget: budgets[2]))
+    }
+
+    func testDayRemainingFraction_dayWithoutDataIsNil() {
+        let snapshots = [snapshot(2026, 10, 8, start: 20, end: 25)]
+        let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertNil(usages[0])
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: usages[0], budget: 10))
+    }
 }

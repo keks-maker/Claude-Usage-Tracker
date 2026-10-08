@@ -221,6 +221,14 @@ enum WeeklyDailyUsage {
         max(0, budget - usage)
     }
 
+    /// Fill level of a day's budget bar: the share of the day's budget still left (0 to 1).
+    /// The bar's full height is the budget, so 0 usage gives 1 and usage at or above the budget gives 0.
+    /// `nil` if the usage or the budget is unknown, or the budget is not positive.
+    static func dayRemainingFraction(usage: Double?, budget: Double?) -> Double? {
+        guard let usage, let budget, usage.isFinite, budget.isFinite, budget > 0 else { return nil }
+        return min(1, max(0, (budget - usage) / budget))
+    }
+
     // MARK: - Daily Budget
 
     /// Number of calendar days until the weekly reset, at least 1.

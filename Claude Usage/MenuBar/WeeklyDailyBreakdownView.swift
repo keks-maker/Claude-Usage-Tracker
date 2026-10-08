@@ -2,8 +2,8 @@
 //  WeeklyDailyBreakdownView.swift
 //  Claude Usage
 //
-//  Seven columns (one per day of the weekly window) showing how much of the
-//  weekly usage was consumed per day, with the daily budget as a reference line.
+//  Seven columns (one per day of the weekly window). Each column is a frame whose
+//  full height is that day's daily budget; the filled part is the budget still left.
 //
 
 import SwiftUI
@@ -53,22 +53,17 @@ struct WeeklyDailyBreakdownView: View {
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
         )
-        // Past days are drawn in weekly percentage points; today is drawn relative to its budget
-        let pastIndices = days.indices.filter { index in index != todayIndex }
-        let scaleMax = max(
-            pastIndices.compactMap { usages[$0] }.max() ?? 0,
-            pastIndices.compactMap { storedBudgets[$0] }.max() ?? 0,
-            1
-        )
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(days.indices, id: \.self) { index in
                     let isToday = index == todayIndex
+                    let usage = isToday ? todayUsage : usages[index]
+                    let dayBudget: Double? = isToday ? budget : storedBudgets[index]
                     dayColumn(
                         day: days[index],
-                        bar: isToday ? todayBar(usage: todayUsage, budget: budget) : pastBar(usage: usages[index], budget: storedBudgets[index], scaleMax: scaleMax),
-                        referenceLine: isToday ? nil : storedBudgets[index].map { $0 / scaleMax },
+                        remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
+                        isOverBudget: isOverBudget(usage: usage, budget: dayBudget),
                         isToday: isToday
                     )
                 }
@@ -87,48 +82,20 @@ struct WeeklyDailyBreakdownView: View {
         .padding(.vertical, 4)
     }
 
-    /// Today's bar: 0 to 100 % of the daily budget. Orange once the budget is reached.
-    private func todayBar(usage: Double?, budget: Double) -> DayBar? {
-        guard let usage else { return nil }
-        return DayBar(
-            fraction: WeeklyDailyUsage.todayBarFraction(usage: usage, budget: budget),
-            isOverBudget: WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: usage, budget: budget)
-        )
-    }
-
-    /// Past day's bar: weekly percentage points on the shared scale. Orange if the
-    /// day's usage reached the budget that applied to it.
-    private func pastBar(usage: Double?, budget: Double?, scaleMax: Double) -> DayBar? {
-        guard let usage else { return nil }
-        return DayBar(fraction: usage / scaleMax, isOverBudget: budget.map { usage >= $0 } ?? false)
+    /// True once a day's usage has reached the budget that applied to it.
+    private func isOverBudget(usage: Double?, budget: Double?) -> Bool {
+        guard let usage, let budget else { return false }
+        return WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: usage, budget: budget)
     }
 
     private func formatPoints(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
-    private func dayColumn(day: Date, bar: DayBar?, referenceLine: Double?, isToday: Bool) -> some View {
+    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool) -> some View {
         VStack(spacing: 2) {
-            ZStack(alignment: .bottom) {
-                Color.clear
-                if let bar {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(bar.isOverBudget ? Color.orange : Color.accentColor.opacity(isToday ? 1 : 0.6))
-                        .frame(height: max(2, barAreaHeight * CGFloat(min(1, bar.fraction))))
-                } else {
-                    // Missing day: thin placeholder, distinct from a real 0
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(height: 1)
-                }
-            }
-            .overlay {
-                // Daily budget that applied to a past day
-                if let referenceLine {
-                    referenceLineView(fraction: referenceLine)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: barAreaHeight)
+            budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget)
+                .frame(maxWidth: .infinity, maxHeight: barAreaHeight)
 
             Text(Self.weekdayFormatter.string(from: day))
                 .font(.caption2)
@@ -139,26 +106,31 @@ struct WeeklyDailyBreakdownView: View {
                 .frame(height: 14)
         }
         .frame(maxWidth: .infinity)
-        .background(
-            isToday ? Color.accentColor.opacity(0.12) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 4)
-        )
-    }
-
-    private func referenceLineView(fraction: Double) -> some View {
-        GeometryReader { geometry in
-            let y = geometry.size.height * CGFloat(1 - min(1, max(0, fraction)))
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: geometry.size.width, y: y))
+        // Today is marked by an outline only, not by a background that could read as a bar
+        .overlay {
+            if isToday {
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.accentColor, lineWidth: 1)
             }
-            .stroke(Color.primary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
         }
     }
 
-    /// Height of a column's bar as a fraction of the bar area, plus its warning state.
-    private struct DayBar {
-        let fraction: Double
-        let isOverBudget: Bool
+    /// Frame = daily budget (full height). Fill = budget still left, emptying from the top as usage grows.
+    /// Dashed frame without fill when the day has no data or no budget is known.
+    private func budgetBar(remainingFraction: Double?, isOverBudget: Bool) -> some View {
+        let frameColor = isOverBudget ? Color.orange : Color.secondary
+        return ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(
+                    remainingFraction == nil ? frameColor.opacity(0.5) : frameColor,
+                    style: StrokeStyle(lineWidth: 1, dash: remainingFraction == nil ? [2, 2] : [])
+                )
+
+            if let remainingFraction, remainingFraction > 0 {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(isOverBudget ? Color.orange : Color.accentColor)
+                    .frame(height: max(1, barAreaHeight * CGFloat(remainingFraction)))
+            }
+        }
     }
 }
