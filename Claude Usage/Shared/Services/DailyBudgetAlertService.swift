@@ -62,7 +62,8 @@ final class DailyBudgetAlertService {
             calendar: calendar
         ) else { return false }
 
-        let budget = WeeklyDailyUsage.dailyBudget(
+        let budget = WeeklyDailyUsage.todayBudget(
+            snapshots: snapshots,
             currentWeeklyPercentage: usage.weeklyPercentage,
             now: now,
             weeklyResetTime: usage.weeklyResetTime,

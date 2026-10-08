@@ -38,9 +38,15 @@ struct WeeklyDailyBreakdownView: View {
         let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
         let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let storedBudgets = WeeklyDailyUsage.storedBudgets(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
-        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: weeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
         let todayUsage = WeeklyDailyUsage.todayUsage(
+            snapshots: snapshots,
+            currentWeeklyPercentage: weeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        let budget = WeeklyDailyUsage.todayBudget(
             snapshots: snapshots,
             currentWeeklyPercentage: weeklyPercentage,
             now: now,

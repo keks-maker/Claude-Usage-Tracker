@@ -87,8 +87,9 @@ enum WeeklyDailyUsage {
         }
 
         var result = existing.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
-        // The budget of the last fetch of the day is kept for the day's column
-        let budget = dailyBudget(
+        // Today's budget is fixed at the start of the day, so every fetch of the day stores the same value
+        let budget = todayBudget(
+            snapshots: existing,
             currentWeeklyPercentage: percentage,
             now: now,
             weeklyResetTime: weeklyResetTime,
@@ -237,16 +238,50 @@ enum WeeklyDailyUsage {
         return max(1, dayDistance + partialDay)
     }
 
-    /// Percentage points that can still be used per remaining day to reach
-    /// 100 % exactly at the weekly reset.
-    static func dailyBudget(
+    /// Budget for today, fixed at the start of the day: the weekly allowance that was
+    /// left at the start of today, spread over the calendar days remaining including today.
+    ///
+    /// The start value is `todayBaseline` (previous day's end, or today's first value).
+    /// If today has no value yet, `currentWeeklyPercentage` is the first value of the day.
+    static func todayBudget(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar = .current
+    ) -> Double {
+        let current = min(100, max(0, currentWeeklyPercentage))
+        let dayStartValue = todayBaseline(
+            snapshots: snapshots,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ) ?? current
+        let startUsed = min(100, max(0, dayStartValue))
+        // Evaluated at midnight: counts today as a full day, like the days after it
+        let days = remainingDays(
+            now: calendar.startOfDay(for: now),
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        return (100 - startUsed) / Double(days)
+    }
+
+    /// Budget per day for the days after today, if the weekly usage stays at
+    /// `currentWeeklyPercentage`: the allowance left now, spread over the calendar
+    /// days after today (at least 1).
+    static func restDailyBudget(
         currentWeeklyPercentage: Double,
         now: Date,
         weeklyResetTime: Date,
         calendar: Calendar = .current
     ) -> Double {
         let clampedUsed = min(100, max(0, currentWeeklyPercentage))
-        let remaining = Double(remainingDays(now: now, weeklyResetTime: weeklyResetTime, calendar: calendar))
-        return (100 - clampedUsed) / remaining
+        let daysIncludingToday = remainingDays(
+            now: calendar.startOfDay(for: now),
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        return (100 - clampedUsed) / Double(max(1, daysIncludingToday - 1))
     }
 }
