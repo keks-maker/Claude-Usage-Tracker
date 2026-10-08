@@ -31,32 +31,34 @@ final class WeeklyDailyUsageTests: XCTestCase {
         )
     }
 
+    private func futureBudget(_ current: Double, now: Date, snapshots: [DailyWeeklySnapshot] = []) -> Double {
+        WeeklyDailyUsage.futureDailyBudget(snapshots: snapshots, currentWeeklyPercentage: current, now: now, weeklyResetTime: resetTime, calendar: calendar)
+    }
+
     // MARK: - Daily Budget
 
-    func testRestDailyBudget_spreadsRemainingAllowanceOverRemainingDays() {
-        // Thu 13:00 -> reset Mon 12:59 is 3.99 days away, rounded up to 4 days
+    func testFutureDailyBudget_spreadsAllowanceAfterTodaysBudgetEnd() {
+        // Thu 13:00, 4 days after today. No earlier day: baseline = live value 40,
+        // today's budget (100 - 40) / 5 = 12, end 52, step (100 - 52) / 4 = 12
         let now = Self.date(2026, 10, 8, 13, 0)
-        let budget = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(budget, 15, accuracy: 0.0001)
+        XCTAssertEqual(futureBudget(40, now: now), 12, accuracy: 0.0001)
     }
 
-    func testRestDailyBudget_atLeastOneDayBeforeReset() {
-        // Two hours before reset: the whole remaining allowance is the budget for one day
+    func testFutureDailyBudget_resetDayHasNoFutureAllowance() {
+        // Two hours before reset: today's budget is everything left, so nothing remains for later days
+        // (the step falls back to the 1-day minimum but the chain starts at 100)
         let now = resetTime.addingTimeInterval(-2 * 60 * 60)
-        let budget = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 30, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(budget, 70, accuracy: 0.0001)
+        XCTAssertEqual(futureBudget(30, now: now), 0, accuracy: 0.0001)
+        // Reset already passed: same
+        XCTAssertEqual(futureBudget(90, now: resetTime.addingTimeInterval(60)), 0, accuracy: 0.0001)
     }
 
-    func testRestDailyBudget_resetInPastStillUsesOneDay() {
-        let now = resetTime.addingTimeInterval(60)
-        let budget = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 90, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(budget, 10, accuracy: 0.0001)
-    }
-
-    func testRestDailyBudget_clampsUsageToValidRange() {
-        let now = Self.date(2026, 10, 8, 13, 0)  // 4 remaining days
-        XCTAssertEqual(WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 120, now: now, weeklyResetTime: resetTime, calendar: calendar), 0, accuracy: 0.0001)
-        XCTAssertEqual(WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: -5, now: now, weeklyResetTime: resetTime, calendar: calendar), 25, accuracy: 0.0001)
+    func testFutureDailyBudget_clampsUsageToValidRange() {
+        let now = Self.date(2026, 10, 8, 13, 0)  // 4 days after today
+        XCTAssertEqual(futureBudget(120, now: now), 0, accuracy: 0.0001)
+        // -5 -> 0: today's budget 20, end 20, step 80 / 4 = 20
+        XCTAssertEqual(futureBudget(-5, now: now), 20, accuracy: 0.0001)
+        XCTAssertEqual(futureBudget(.nan, now: now), 0)
     }
 
     func testRemainingDays_partialDayCountsAsFullDay() {
@@ -341,14 +343,15 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertTrue(WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: 12.2, budget: budget))
     }
 
-    func testRestDailyBudget_decreasesForFollowingDaysWhenUsageGrows() {
-        // Thu 12:00 with 39 % used: 61 / 4 days after today
+    func testFutureDailyBudget_unchangedUnderBudgetAndShrinksWhenOverBudget() {
+        // Thu 12:00, Wed ended at 39: today's budget 12.2, end 51.2, step 12.2
         let now = Self.date(2026, 10, 8, 12, 0)
-        let before = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        let after = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 50, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(before, 15.25, accuracy: 0.0001)
-        XCTAssertLessThan(after, before)
-        XCTAssertEqual(after, 12.5, accuracy: 0.0001)
+        let snaps = [snapshot(2026, 10, 7, start: 30, end: 39)]
+        XCTAssertEqual(futureBudget(39, now: now, snapshots: snaps), 12.2, accuracy: 0.0001)
+        // Under today's budget the step does not change: unused allowance only flows on the next day
+        XCTAssertEqual(futureBudget(50, now: now, snapshots: snaps), 12.2, accuracy: 0.0001)
+        // Over today's budget the chain starts at the live value: (100 - 60) / 4
+        XCTAssertEqual(futureBudget(60, now: now, snapshots: snaps), 10, accuracy: 0.0001)
     }
 
     func testTodayRemaining_neverNegative() {
@@ -590,8 +593,8 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
     func testFutureDay_fullBudgetFillWithRestBudget() {
         let now = Self.date(2026, 10, 8, 12, 0)
-        let rest = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
-        XCTAssertEqual(rest, 15.25, accuracy: 0.0001)
+        let rest = futureBudget(39, now: now)
+        XCTAssertEqual(rest, 12.2, accuracy: 0.0001)
         XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: rest), 1)
     }
 
@@ -606,7 +609,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertTrue(cols[2].isEstimated)
         for index in 3...6 {          // Fri ... Mon
             XCTAssertEqual(cols[index].usage, 0)
-            XCTAssertEqual(cols[index].budget ?? -1, 15.25, accuracy: 0.0001)
+            XCTAssertEqual(cols[index].budget ?? -1, 12.2, accuracy: 0.0001)
             XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: cols[index].usage, budget: cols[index].budget), 1)
         }
     }
@@ -745,10 +748,10 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(markers[2]?.percentage ?? -1, 36, accuracy: 0.0001)
         XCTAssertEqual(markers[2]?.columnIndex, 2)
         XCTAssertEqual(markers[2]?.isEstimated, false)
-        // Fri-Mon: 25 + k * (75 / 4)
-        XCTAssertEqual(markers[3]?.percentage ?? -1, 43.75, accuracy: 0.0001)
-        XCTAssertEqual(markers[4]?.percentage ?? -1, 62.5, accuracy: 0.0001)
-        XCTAssertEqual(markers[5]?.percentage ?? -1, 81.25, accuracy: 0.0001)
+        // Fri-Mon: 36 + k * (64 / 4), same chain as today's marker
+        XCTAssertEqual(markers[3]?.percentage ?? -1, 52, accuracy: 0.0001)
+        XCTAssertEqual(markers[4]?.percentage ?? -1, 68, accuracy: 0.0001)
+        XCTAssertEqual(markers[5]?.percentage ?? -1, 84, accuracy: 0.0001)
         XCTAssertEqual(markers[6]?.percentage ?? -1, 100, accuracy: 0.0001)
         XCTAssertEqual(markers[6]?.isEstimated, false)
     }
@@ -758,8 +761,9 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let markers = WeeklyDailyUsage.columnMarkers(snapshots: [], currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(markers[2]?.percentage ?? -1, 52, accuracy: 0.0001)
         XCTAssertEqual(markers[2]?.isEstimated, true)
-        // Future days do not depend on the baseline
-        XCTAssertEqual(markers[3]?.isEstimated, false)
+        // Future markers chain from today's estimated end: 52 + 12
+        XCTAssertEqual(markers[3]?.percentage ?? -1, 64, accuracy: 0.0001)
+        XCTAssertEqual(markers[3]?.isEstimated, true)
     }
 
     func testColumnMarkers_lastDayEndsAt100() {
@@ -769,6 +773,35 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 75, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(markers[6]?.percentage ?? -1, 100, accuracy: 0.0001)
         XCTAssertEqual(markers.compactMap { $0 }.count, 1)
+    }
+
+    func testColumnMarkers_equalSegmentsAndColumnBudgetEqualsSegmentWidth() {
+        // Wed ended at 39, Thu live 40: today's end 51.2, step (100 - 51.2) / 4 = 12.2
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 30, end: 39)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        let cols = WeeklyDailyUsage.columnValues(snapshots: snaps, currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        let expected = [51.2, 63.4, 75.6, 87.8, 100]
+        for (offset, value) in expected.enumerated() {
+            XCTAssertEqual(markers[2 + offset]?.percentage ?? -1, value, accuracy: 0.0001)
+        }
+        for index in 3...6 {
+            let width = (markers[index]?.percentage ?? 0) - (markers[index - 1]?.percentage ?? 0)
+            XCTAssertEqual(width, 12.2, accuracy: 0.0001)
+            XCTAssertEqual(cols[index].budget ?? -1, width, accuracy: 0.0001)
+        }
+    }
+
+    func testColumnMarkers_overBudgetStartsChainAtLiveValue() {
+        // Today's end would be 51.2 but 60 is already used: chain starts at 60, step 10
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 30, end: 39)]
+        let markers = WeeklyDailyUsage.columnMarkers(snapshots: snaps, currentWeeklyPercentage: 60, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(markers[2]?.percentage ?? -1, 51.2, accuracy: 0.0001)
+        let future = (3...6).map { markers[$0]?.percentage ?? -1 }
+        for (value, expected) in zip(future, [70.0, 80.0, 90.0, 100.0]) {
+            XCTAssertEqual(value, expected, accuracy: 0.0001)
+        }
     }
 
     func testColumnMarkers_neverAbove100() {
@@ -794,5 +827,23 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let now = Self.date(2026, 10, 8, 13, 0)
         let invalid = WeeklyDailyUsage.columnMarkers(snapshots: [], currentWeeklyPercentage: .nan, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertTrue(invalid.allSatisfy { $0 == nil })
+    }
+
+    // MARK: - Marker Mapping
+
+    func testWeeklyDayMarker_mapsColumnIndexToColorAndWeekdayName() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let snaps = [snapshot(2026, 10, 7, start: 30, end: 39)]
+        let markers = WeeklyDayMarker.markers(snapshots: snaps, currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        // Thu (column 2) to Mon (column 6)
+        XCTAssertEqual(markers.count, 5)
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
+        for (offset, marker) in markers.enumerated() {
+            let column = 2 + offset
+            XCTAssertEqual(marker.color, WeeklyDayPalette.color(for: column))
+            XCTAssertEqual(marker.weekdayName, WeeklyDayPalette.weekdayName(days[column]))
+        }
+        XCTAssertEqual(markers.last?.percentage ?? -1, 100, accuracy: 0.0001)
+        XCTAssertEqual(Set(markers.map { $0.weekdayName }).count, 5)
     }
 }

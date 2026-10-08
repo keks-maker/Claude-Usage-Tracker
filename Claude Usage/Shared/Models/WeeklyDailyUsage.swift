@@ -276,9 +276,8 @@ enum WeeklyDailyUsage {
     /// - Today: live usage and today's budget. While the baseline is unreliable the first value of
     ///   the day stands in for the day start, so the budget is an estimate (`isEstimated`) and the
     ///   measured usage is a lower bound.
-    /// - Days after today: usage 0 and `restDailyBudget`, which depends only on the current
-    ///   weekly value, never on the baseline. They are therefore always known.
-    ///   (`restDailyBudget` spreads the allowance left now over the calendar days after today.)
+    /// - Days after today: usage 0 and `futureDailyBudget`, the same per-day step as the markers
+    ///   of those days (one chain with today's budget end, see `futureDailyBudget`).
     static func columnValues(
         snapshots: [DailyWeeklySnapshot],
         currentWeeklyPercentage: Double,
@@ -292,7 +291,7 @@ enum WeeklyDailyUsage {
         let reliable = isTodayBaselineReliable(snapshots: snapshots, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let live = todayUsage(snapshots: snapshots, currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let todayB = todayBudget(snapshots: snapshots, currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
-        let rest = restDailyBudget(currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let rest = futureDailyBudget(snapshots: snapshots, currentWeeklyPercentage: currentWeeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let today = calendar.startOfDay(for: now)
 
         return days.indices.map { index in
@@ -369,17 +368,17 @@ enum WeeklyDailyUsage {
 
     /// Budget end markers per column, aligned with `dayStarts`.
     ///
-    /// Cumulation (all values on the weekly scale, capped at 100):
+    /// One chain on the weekly scale (all values capped at 100):
     /// - Past days: `nil`, no marker.
     /// - Today: `todayBudgetEnd` (day start value + today's budget).
-    /// - Day k after today (k = 1...n): current weekly value + k * `restDailyBudget`.
-    ///   This uses the same per-day budget as the columns of those days, so marker and
-    ///   column always agree, and the last day ends exactly at 100.
-    ///   Because the future markers start from the live value and today's marker from the
-    ///   day start value, a day that stays under its budget moves the later markers to
-    ///   the right of what the day start plan said (the saved allowance is spread over
-    ///   the remaining days).
+    /// - Day k after today (k = 1...n): S + k * b with S and b from `futureDailyBudget`
+    ///   (S = max(today's budget end, live value)). All segments from today's marker onwards are
+    ///   equally wide, the last day ends exactly at 100, and each column's budget equals its
+    ///   segment width. Example: day start 39, today's budget 12.2, 4 days after today:
+    ///   51.2 (today), 63.4, 75.6, 87.8, 100. Allowance left unused today only flows into the
+    ///   remaining days on the next day, through its new day start value.
     /// - A day with a budget of 0 has no marker (nothing to mark).
+    /// Future markers are estimates (`isEstimated`) when today's marker is.
     /// `nil` for all columns if `now` is not on a column or the live value is invalid.
     static func columnMarkers(
         snapshots: [DailyWeeklySnapshot],
@@ -402,12 +401,14 @@ enum WeeklyDailyUsage {
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
         )
-        let rest = restDailyBudget(
+        let chain = futureChain(
+            snapshots: snapshots,
             currentWeeklyPercentage: current,
             now: now,
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
         )
+        let rest = chain.budget
 
         var futureStep = 0
         return days.indices.map { index in
@@ -422,8 +423,8 @@ enum WeeklyDailyUsage {
                 guard rest > 0 else { return nil }
                 return ColumnMarker(
                     columnIndex: index,
-                    percentage: min(100, current + Double(futureStep) * rest),
-                    isEstimated: false
+                    percentage: min(100, chain.start + Double(futureStep) * rest),
+                    isEstimated: todayEnd?.isEstimated ?? false
                 )
             }
             return nil
@@ -476,21 +477,51 @@ enum WeeklyDailyUsage {
         return (100 - startUsed) / Double(days)
     }
 
-    /// Budget per day for the days after today, if the weekly usage stays at
-    /// `currentWeeklyPercentage`: the allowance left now, spread over the calendar
-    /// days after today (at least 1).
-    static func restDailyBudget(
+    /// Start and per-day step of the chain for the days after today.
+    /// Start `S` = max(today's budget end, live value): the live value wins once today's budget
+    /// is exceeded. Step `b` = (100 - S) / n, n = calendar days after today including the reset day
+    /// (at least 1). 0 if `S` is 100 or above, or if the live value is invalid.
+    static func futureChain(
+        snapshots: [DailyWeeklySnapshot],
         currentWeeklyPercentage: Double,
         now: Date,
         weeklyResetTime: Date,
         calendar: Calendar = .current
-    ) -> Double {
-        let clampedUsed = min(100, max(0, currentWeeklyPercentage))
+    ) -> (start: Double, budget: Double) {
+        guard currentWeeklyPercentage.isFinite else { return (0, 0) }
+        let current = min(100, max(0, currentWeeklyPercentage))
+        let todayEnd = todayBudgetEnd(
+            snapshots: snapshots,
+            currentWeeklyPercentage: current,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )?.percentage ?? current
+        let start = min(100, max(todayEnd, current))
         let daysIncludingToday = remainingDays(
             now: calendar.startOfDay(for: now),
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
         )
-        return (100 - clampedUsed) / Double(max(1, daysIncludingToday - 1))
+        return (start, max(0, 100 - start) / Double(max(1, daysIncludingToday - 1)))
+    }
+
+    /// Budget per day for the days after today: the allowance left after today's budget end
+    /// (or after the live value if today is over budget), spread evenly over the calendar days
+    /// after today (at least 1). Same value as the segment width between the future markers.
+    static func futureDailyBudget(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar = .current
+    ) -> Double {
+        futureChain(
+            snapshots: snapshots,
+            currentWeeklyPercentage: currentWeeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ).budget
     }
 }
