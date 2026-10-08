@@ -66,6 +66,7 @@
 "menubar.5_hour_window" = "Janela móvel de 5 horas";
 "menubar.all_models" = "Todos os modelos";
 "menubar.weekly" = "Semanal";
+"popover.daily_budget.today" = "hoje: %d%% de %d%%";
 "menubar.anthropic_console" = "Console da API Anthropic";
 "menubar.used" = "Usado";
 "menubar.remaining" = "Restante";

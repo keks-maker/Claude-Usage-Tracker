@@ -69,6 +69,7 @@
 "menubar.5_hour_window" = "5小时滚动窗口";
 "menubar.all_models" = "所有模型";
 "menubar.weekly" = "每周";
+"popover.daily_budget.today" = "今日：%d%%，预算 %d%%";
 "menubar.anthropic_console" = "Anthropic API 控制台";
 "menubar.api_cost" = "API 费用";
 "menubar.cost_source.api" = "API";

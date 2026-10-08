@@ -68,6 +68,7 @@
 "menubar.5_hour_window" = "5時間ローリングウィンドウ";
 "menubar.all_models" = "すべてのモデル";
 "menubar.weekly" = "週次";
+"popover.daily_budget.today" = "今日: %d%%（目安 %d%%）";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";

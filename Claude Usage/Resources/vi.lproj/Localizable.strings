@@ -74,6 +74,7 @@
 "menubar.5_hour_window" = "Chu kỳ xoay vòng 5 giờ";
 "menubar.all_models" = "Tất cả mô hình";
 "menubar.weekly" = "Hàng tuần";
+"popover.daily_budget.today" = "hôm nay: %d%% trên %d%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Đã dùng";
 "menubar.remaining" = "Còn lại";

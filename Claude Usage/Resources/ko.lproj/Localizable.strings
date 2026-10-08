@@ -77,6 +77,7 @@
 "menubar.5_hour_window" = "5시간 롤링 윈도우";
 "menubar.all_models" = "모든 모델";
 "menubar.weekly" = "주간";
+"popover.daily_budget.today" = "오늘: %d%% / 예산 %d%%";
 "menubar.anthropic_console" = "Anthropic API 콘솔";
 "menubar.used" = "사용됨";
 "menubar.remaining" = "남음";

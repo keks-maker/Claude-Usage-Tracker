@@ -68,6 +68,7 @@
 "menubar.5_hour_window" = "5-Stunden-Gleitfenster";
 "menubar.all_models" = "Alle Modelle";
 "menubar.weekly" = "Wöchentlich";
+"popover.daily_budget.today" = "heute: %d %% von %d %%";
 "menubar.anthropic_console" = "Anthropic API-Konsole";
 "menubar.used" = "Verbraucht";
 "menubar.remaining" = "Verbleibend";

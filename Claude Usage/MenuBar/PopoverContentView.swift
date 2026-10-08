@@ -84,6 +84,11 @@ struct PopoverContentView: View {
         manager.clickedProfileUsage ?? manager.usage
     }
 
+    /// Profile whose usage is shown (clicked profile in multi-profile mode, else active).
+    private var displayProfileId: UUID? {
+        manager.clickedProfileId ?? profileManager.activeProfile?.id
+    }
+
     private var displayAPIUsage: APIUsage? {
         // When viewing a non-active profile, use only that profile's API data
         // to avoid leaking the active profile's console data
@@ -208,7 +213,7 @@ struct PopoverContentView: View {
             }
 
             // Usage
-            SmartUsageDashboard(usage: displayUsage, apiUsage: displayAPIUsage, provider: displayProvider)
+            SmartUsageDashboard(usage: displayUsage, apiUsage: displayAPIUsage, provider: displayProvider, profileId: displayProfileId)
 
             // Contextual Insights
             if showInsights {
@@ -588,6 +593,7 @@ struct SmartUsageDashboard: View {
     let usage: ClaudeUsage
     let apiUsage: APIUsage?
     var provider: Provider = .anthropic
+    var profileId: UUID? = nil
     @StateObject private var profileManager = ProfileManager.shared
     private var capabilities: ProviderCapabilities {
         provider.descriptor.capabilities
@@ -667,6 +673,12 @@ struct SmartUsageDashboard: View {
                 showPaceMarker: showPaceMarker,
                 usePaceColoring: usePaceColoring,
                 timeDisplay: timeDisplay
+            )
+
+            WeeklyDailyBreakdownView(
+                profileId: profileId,
+                weeklyPercentage: usage.weeklyPercentage,
+                weeklyResetTime: usage.weeklyResetTime
             )
 
             if usage.fableWeeklyTokensUsed > 0 {

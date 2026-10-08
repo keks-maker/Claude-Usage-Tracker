@@ -66,6 +66,7 @@
 "menubar.5_hour_window" = "finestra mobile di 5 ore";
 "menubar.all_models" = "Tutti i modelli";
 "menubar.weekly" = "Settimanale";
+"popover.daily_budget.today" = "oggi: %d%% di %d%%";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilizzato";
 "menubar.remaining" = "Rimanente";

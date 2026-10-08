@@ -68,6 +68,7 @@
 "menubar.5_hour_window" = "Fenêtre glissante de 5 heures";
 "menubar.all_models" = "Tous les modèles";
 "menubar.weekly" = "Hebdomadaire";
+"popover.daily_budget.today" = "aujourd’hui : %d %% sur %d %%";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilisé";
 "menubar.remaining" = "Restant";

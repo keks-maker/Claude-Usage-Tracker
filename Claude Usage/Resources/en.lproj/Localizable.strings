@@ -74,6 +74,7 @@
 "menubar.5_hour_window" = "5-hour rolling window";
 "menubar.all_models" = "All models";
 "menubar.weekly" = "Weekly";
+"popover.daily_budget.today" = "today: %d%% of %d%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Used";
 "menubar.remaining" = "Remaining";

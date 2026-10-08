@@ -129,6 +129,7 @@ class ProfileManager: ObservableObject {
 
         // Clean up usage history for this profile
         UsageHistoryService.shared.deleteHistory(for: id)
+        WeeklyDailySnapshotStore.shared.deleteSnapshots(for: id)
         LoggingService.shared.log("Successfully deleted usage history for profile: \(profileName)")
 
         profiles.removeAll { $0.id == id }
