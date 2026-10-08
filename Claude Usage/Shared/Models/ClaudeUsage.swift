@@ -18,6 +18,10 @@ struct ClaudeUsage: Codable, Equatable {
     var weeklyLimit: Int
     var weeklyPercentage: Double
     var weeklyResetTime: Date
+    /// True only if `weeklyResetTime` was parsed from the API response. A fallback
+    /// date is not a real week boundary, so such values must never start or
+    /// replace a day snapshot. Not persisted: decoded usage is always `false`.
+    var weeklyResetIsFromAPI: Bool = false
 
     // Weekly data (Opus only)
     var opusWeeklyTokensUsed: Int

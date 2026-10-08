@@ -23,6 +23,25 @@ final class WeeklyDailySnapshotStore {
 
     // MARK: - Public
 
+    /// Records a fetched usage for a profile. Only usage whose weekly reset time came
+    /// from the API is recorded; a fallback reset would otherwise start a wrong week
+    /// and discard the stored snapshots of the real one.
+    func recordUsage(
+        _ usage: ClaudeUsage,
+        for profileId: UUID,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        guard usage.weeklyResetIsFromAPI else { return }
+        record(
+            percentage: usage.weeklyPercentage,
+            weeklyResetTime: usage.weeklyResetTime,
+            for: profileId,
+            now: now,
+            calendar: calendar
+        )
+    }
+
     /// Records the current weekly percentage for a profile on the calendar day of `now`.
     func record(
         percentage: Double,

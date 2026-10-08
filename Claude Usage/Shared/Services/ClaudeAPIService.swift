@@ -812,12 +812,15 @@ class ClaudeAPIService: APIServiceProtocol {
             // Extract weekly usage (seven_day)
             var weeklyPercentage = 0.0
             var weeklyResetTime = Date().nextMonday1259pm()
+            var weeklyResetIsFromAPI = false
             if let sevenDay = json["seven_day"] as? [String: Any] {
                 if let utilization = sevenDay["utilization"] {
                     weeklyPercentage = parseUtilization(utilization)
                 }
-                if let resetsAt = sevenDay["resets_at"] as? String {
-                    weeklyResetTime = resetTimeFormatter.date(from: resetsAt) ?? weeklyResetTime
+                if let resetsAt = sevenDay["resets_at"] as? String,
+                   let parsedReset = resetTimeFormatter.date(from: resetsAt) {
+                    weeklyResetTime = parsedReset
+                    weeklyResetIsFromAPI = true
                 }
             }
 
@@ -924,6 +927,7 @@ class ClaudeAPIService: APIServiceProtocol {
                 weeklyLimit: weeklyLimit,
                 weeklyPercentage: weeklyPercentage,
                 weeklyResetTime: weeklyResetTime,
+                weeklyResetIsFromAPI: weeklyResetIsFromAPI,
                 opusWeeklyTokensUsed: opusTokens,
                 opusWeeklyPercentage: opusPercentage,
                 sonnetWeeklyTokensUsed: sonnetTokens,
@@ -993,7 +997,8 @@ class ClaudeAPIService: APIServiceProtocol {
         let weeklyPercentage = weeklyUtilization * 100.0
 
         let weeklyResetTimestamp = headerDouble("anthropic-ratelimit-unified-7d-reset") ?? 0
-        let weeklyResetTime = weeklyResetTimestamp > 0
+        let weeklyResetIsFromAPI = weeklyResetTimestamp > 0
+        let weeklyResetTime = weeklyResetIsFromAPI
             ? Date(timeIntervalSince1970: weeklyResetTimestamp)
             : Date().nextMonday1259pm()
 
@@ -1012,6 +1017,7 @@ class ClaudeAPIService: APIServiceProtocol {
             weeklyLimit: weeklyLimit,
             weeklyPercentage: weeklyPercentage,
             weeklyResetTime: weeklyResetTime,
+            weeklyResetIsFromAPI: weeklyResetIsFromAPI,
             opusWeeklyTokensUsed: 0,
             opusWeeklyPercentage: 0,
             sonnetWeeklyTokensUsed: 0,

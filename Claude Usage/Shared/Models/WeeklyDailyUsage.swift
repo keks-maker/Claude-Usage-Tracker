@@ -26,8 +26,6 @@ enum WeeklyDailyUsage {
     /// (guards against small jitter in the API timestamp).
     static let resetTolerance: TimeInterval = 60
 
-    private static let secondsPerDay: TimeInterval = 24 * 60 * 60
-
     // MARK: - Week Layout
 
     /// Start of the 7-day window that ends at `weeklyResetTime`.
@@ -35,10 +33,16 @@ enum WeeklyDailyUsage {
         weeklyResetTime.addingTimeInterval(-Constants.weeklyWindow)
     }
 
-    /// Local start-of-day dates for the 7 days of the weekly window, oldest first.
+    /// Local start-of-day dates for the 7 columns of the weekly breakdown, oldest first.
+    ///
+    /// The columns end with the calendar day of the reset, so the current day is
+    /// always among them (the reset day included, before the reset time). Because
+    /// the window is 7 x 24 h and not aligned to midnight, the first column starts
+    /// one day after the weekday of `weekStart(for:)`; the part of that first
+    /// weekday that lies inside the window is not shown.
     static func dayStarts(weeklyResetTime: Date, calendar: Calendar) -> [Date] {
-        let first = calendar.startOfDay(for: weekStart(for: weeklyResetTime))
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: first) }
+        let lastDay = calendar.startOfDay(for: weeklyResetTime)
+        return (0..<7).reversed().compactMap { calendar.date(byAdding: .day, value: -$0, to: lastDay) }
     }
 
     /// True if both reset times belong to the same weekly window.
@@ -50,8 +54,10 @@ enum WeeklyDailyUsage {
 
     /// Applies one observation to the stored snapshots and returns the new list.
     ///
-    /// - Snapshots of a different weekly window are discarded (week reset).
-    /// - An observation outside the current window (stale reset time) is ignored.
+    /// - An observation outside the current window (stale or missing reset time)
+    ///   returns the stored snapshots unchanged, so nothing is ever discarded by it.
+    /// - Snapshots of a different weekly window are discarded only by a valid
+    ///   observation, i.e. when a new week really starts.
     /// - The day's entry is created on the first observation of the day and its
     ///   end value is updated on every later one.
     static func applying(
@@ -61,13 +67,13 @@ enum WeeklyDailyUsage {
         to existing: [DailyWeeklySnapshot],
         calendar: Calendar
     ) -> [DailyWeeklySnapshot] {
-        var result = existing.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
-
         guard percentage.isFinite,
               now >= weekStart(for: weeklyResetTime),
               now < weeklyResetTime else {
-            return result
+            return existing
         }
+
+        var result = existing.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
 
         if let index = result.firstIndex(where: { calendar.isDate($0.dayStart, inSameDayAs: now) }) {
             result[index].endPercentage = percentage
@@ -124,10 +130,19 @@ enum WeeklyDailyUsage {
 
     // MARK: - Daily Budget
 
-    /// Number of days until the weekly reset, rounded up, at least 1.
-    static func remainingDays(now: Date, weeklyResetTime: Date) -> Int {
-        let days = ceil(weeklyResetTime.timeIntervalSince(now) / secondsPerDay)
-        return Int(max(1, days))
+    /// Number of calendar days until the weekly reset, at least 1.
+    /// A partial day counts as a full day. Calendar arithmetic keeps this correct
+    /// across DST changes, where a day is not exactly 24 hours.
+    static func remainingDays(now: Date, weeklyResetTime: Date, calendar: Calendar = .current) -> Int {
+        let dayDistance = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: now),
+            to: calendar.startOfDay(for: weeklyResetTime)
+        ).day ?? 0
+        // Same wall-clock time on the reset's day as `now` has today
+        let nowOnResetDay = calendar.date(byAdding: .day, value: dayDistance, to: now) ?? now
+        let partialDay = weeklyResetTime > nowOnResetDay ? 1 : 0
+        return max(1, dayDistance + partialDay)
     }
 
     /// Percentage points that can still be used per remaining day to reach
@@ -135,10 +150,11 @@ enum WeeklyDailyUsage {
     static func dailyBudget(
         currentWeeklyPercentage: Double,
         now: Date,
-        weeklyResetTime: Date
+        weeklyResetTime: Date,
+        calendar: Calendar = .current
     ) -> Double {
         let clampedUsed = min(100, max(0, currentWeeklyPercentage))
-        let remaining = Double(remainingDays(now: now, weeklyResetTime: weeklyResetTime))
+        let remaining = Double(remainingDays(now: now, weeklyResetTime: weeklyResetTime, calendar: calendar))
         return (100 - clampedUsed) / remaining
     }
 }

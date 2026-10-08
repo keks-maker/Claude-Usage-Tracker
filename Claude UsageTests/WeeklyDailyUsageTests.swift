@@ -10,7 +10,8 @@ final class WeeklyDailyUsageTests: XCTestCase {
         return calendar
     }
 
-    /// Weekly window ending Monday 2026-10-12 12:59 (Berlin); days run Mon 10-05 ... Sun 10-11
+    /// Weekly window ending Monday 2026-10-12 12:59 (Berlin). Columns run Tue 10-06 ... Mon 10-12,
+    /// so the reset day itself is a column.
     private let resetTime: Date = date(2026, 10, 12, 12, 59)
 
     private static func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
@@ -35,40 +36,40 @@ final class WeeklyDailyUsageTests: XCTestCase {
     func testDailyBudget_spreadsRemainingAllowanceOverRemainingDays() {
         // Thu 13:00 -> reset Mon 12:59 is 3.99 days away, rounded up to 4 days
         let now = Self.date(2026, 10, 8, 13, 0)
-        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime)
+        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 40, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(budget, 15, accuracy: 0.0001)
     }
 
     func testDailyBudget_atLeastOneDayBeforeReset() {
         // Two hours before reset: the whole remaining allowance is the budget for one day
         let now = resetTime.addingTimeInterval(-2 * 60 * 60)
-        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 30, now: now, weeklyResetTime: resetTime)
+        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 30, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(budget, 70, accuracy: 0.0001)
     }
 
     func testDailyBudget_resetInPastStillUsesOneDay() {
         let now = resetTime.addingTimeInterval(60)
-        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 90, now: now, weeklyResetTime: resetTime)
+        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 90, now: now, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(budget, 10, accuracy: 0.0001)
     }
 
     func testDailyBudget_clampsUsageToValidRange() {
         let now = Self.date(2026, 10, 8, 13, 0)  // 4 remaining days
-        XCTAssertEqual(WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 120, now: now, weeklyResetTime: resetTime), 0, accuracy: 0.0001)
-        XCTAssertEqual(WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: -5, now: now, weeklyResetTime: resetTime), 25, accuracy: 0.0001)
+        XCTAssertEqual(WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 120, now: now, weeklyResetTime: resetTime, calendar: calendar), 0, accuracy: 0.0001)
+        XCTAssertEqual(WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: -5, now: now, weeklyResetTime: resetTime, calendar: calendar), 25, accuracy: 0.0001)
     }
 
     func testRemainingDays_partialDayCountsAsFullDay() {
         let now = resetTime.addingTimeInterval(-(24 * 60 * 60 + 60))
-        XCTAssertEqual(WeeklyDailyUsage.remainingDays(now: now, weeklyResetTime: resetTime), 2)
+        XCTAssertEqual(WeeklyDailyUsage.remainingDays(now: now, weeklyResetTime: resetTime, calendar: calendar), 2)
     }
 
     // MARK: - Daily Usage (snapshot difference)
 
     func testDailyUsage_differenceToPreviousDayEndValue() {
         let snapshots = [
-            snapshot(2026, 10, 5, start: 10, end: 15),  // Mon: no previous day -> start is baseline
-            snapshot(2026, 10, 6, start: 15, end: 22)   // Tue: end(Tue) - end(Mon)
+            snapshot(2026, 10, 6, start: 10, end: 15),  // Tue: no previous column -> start is baseline
+            snapshot(2026, 10, 7, start: 15, end: 22)   // Wed: end(Wed) - end(Tue)
         ]
         let usage = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
 
@@ -79,10 +80,10 @@ final class WeeklyDailyUsageTests: XCTestCase {
     }
 
     func testDailyUsage_missingDayUsesOwnFirstValueAsBaseline() {
-        // Tuesday has no snapshot: Wednesday's baseline is its own first value
+        // Wednesday has no snapshot: Thursday's baseline is its own first value
         let snapshots = [
-            snapshot(2026, 10, 5, start: 10, end: 12),
-            snapshot(2026, 10, 7, start: 20, end: 25)
+            snapshot(2026, 10, 6, start: 10, end: 12),
+            snapshot(2026, 10, 8, start: 20, end: 25)
         ]
         let usage = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
 
@@ -154,11 +155,42 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertTrue(WeeklyDailyUsage.applying(percentage: .nan, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar).isEmpty)
     }
 
-    func testDayStarts_coverSevenCalendarDaysEndingBeforeReset() {
+    func testDayStarts_sevenColumnsEndingWithResetDay() {
         let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertEqual(days.count, 7)
-        XCTAssertEqual(days.first, calendar.startOfDay(for: Self.date(2026, 10, 5, 12, 0)))
-        XCTAssertEqual(days.last, calendar.startOfDay(for: Self.date(2026, 10, 11, 12, 0)))
+        XCTAssertEqual(days.first, calendar.startOfDay(for: Self.date(2026, 10, 6, 12, 0)))
+        XCTAssertEqual(days.last, calendar.startOfDay(for: Self.date(2026, 10, 12, 12, 0)))
+    }
+
+    func testDayStarts_currentDayIsIncludedOnResetDayBeforeResetTime() {
+        // Monday 09:00, reset Monday 12:59: today must still get a column
+        let now = Self.date(2026, 10, 12, 9, 0)
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertTrue(days.contains { calendar.isDate($0, inSameDayAs: now) })
+    }
+
+    func testApplying_observationOnResetDayIsShownInItsColumn() {
+        let now = Self.date(2026, 10, 12, 9, 0)
+        let stored = WeeklyDailyUsage.applying(percentage: 40, at: now, weeklyResetTime: resetTime, to: [], calendar: calendar)
+        let usage = WeeklyDailyUsage.dailyUsage(snapshots: stored, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(usage.count, 7)
+        XCTAssertEqual(usage[6] ?? -1, 0, accuracy: 0.0001)  // no previous column: own start is baseline
+        XCTAssertNil(usage[5])
+    }
+
+    func testApplying_invalidObservationKeepsExistingSnapshots() {
+        let existing = [snapshot(2026, 10, 6, start: 10, end: 12)]
+        let now = Self.date(2026, 10, 6, 20, 0)
+        let invalidPercentage = WeeklyDailyUsage.applying(
+            percentage: .nan, at: now, weeklyResetTime: resetTime, to: existing, calendar: calendar
+        )
+        XCTAssertEqual(invalidPercentage, existing)
+
+        // Reset time in the past (stale): nothing is written and nothing is discarded
+        let stale = WeeklyDailyUsage.applying(
+            percentage: 30, at: now, weeklyResetTime: resetTime.addingTimeInterval(-7 * 24 * 60 * 60), to: existing, calendar: calendar
+        )
+        XCTAssertEqual(stale, existing)
     }
 
     // MARK: - Store
@@ -184,5 +216,46 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
         store.deleteSnapshots(for: profileId)
         XCTAssertTrue(store.snapshots(for: profileId).isEmpty)
+    }
+
+    func testRecordUsage_fallbackResetLeavesStoredSnapshotsUnchanged() {
+        let suite = "WeeklyDailySnapshotFallbackTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        let profileId = UUID()
+        let now = Self.date(2026, 10, 8, 12, 0)
+        store.record(percentage: 10, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
+        store.record(percentage: 13, weeklyResetTime: resetTime, for: profileId, now: now.addingTimeInterval(3600), calendar: calendar)
+        let before = store.snapshots(for: profileId)
+        XCTAssertEqual(before.count, 1)
+
+        // Response without seven_day.resets_at: fallback date, flag false
+        var fallback = ClaudeUsage.empty
+        fallback.weeklyPercentage = 99
+        fallback.weeklyResetTime = Date().nextMonday1259pm(in: calendar.timeZone)
+        fallback.weeklyResetIsFromAPI = false
+        store.recordUsage(fallback, for: profileId, now: now.addingTimeInterval(7200), calendar: calendar)
+
+        XCTAssertEqual(store.snapshots(for: profileId), before)
+    }
+
+    func testRecordUsage_apiResetUpdatesSnapshot() {
+        let suite = "WeeklyDailySnapshotAPITests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        let profileId = UUID()
+        var usage = ClaudeUsage.empty
+        usage.weeklyPercentage = 20
+        usage.weeklyResetTime = resetTime
+        usage.weeklyResetIsFromAPI = true
+        store.recordUsage(usage, for: profileId, now: Self.date(2026, 10, 8, 12, 0), calendar: calendar)
+
+        XCTAssertEqual(store.snapshots(for: profileId).first?.endPercentage, 20)
     }
 }

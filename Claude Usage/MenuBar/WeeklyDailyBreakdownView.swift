@@ -37,7 +37,7 @@ struct WeeklyDailyBreakdownView: View {
         let snapshots = WeeklyDailySnapshotStore.shared.snapshots(for: profileId)
         let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
         let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: weeklyResetTime, calendar: calendar)
-        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: weeklyPercentage, now: now, weeklyResetTime: weeklyResetTime)
+        let budget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: weeklyPercentage, now: now, weeklyResetTime: weeklyResetTime, calendar: calendar)
         let scaleMax = max(budget, usages.compactMap { $0 }.max() ?? 0, 1)
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
 
