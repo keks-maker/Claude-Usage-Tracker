@@ -74,7 +74,7 @@
 "menubar.5_hour_window" = "Ковзне вікно 5 годин";
 "menubar.all_models" = "Всі моделі";
 "menubar.weekly" = "Тижневе";
-"popover.daily_budget.today" = "сьогодні: %d%% з %d%%";
+"popover.daily_budget.today" = "сьогодні: залишок %@%% з %@%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Використано";
 "menubar.remaining" = "Залишилось";
@@ -1089,3 +1089,5 @@
 "support.popup_signature" = "команда з однієї людини за Claude Usage";
 "support.popup_body" = "Безплатний, з відкритим кодом, зроблений однією людиною — без реклами й стеження. Якщо він урятував вас від спаленого ліміту сесії, кава тримає його живим.";
 "support.popup_days" = "Пильнує ваші ліміти вже %d днів — завжди безплатно";
+"notification.daily_budget.title" = "Денний бюджет вичерпано";
+"notification.daily_budget.message" = "Сьогоднішнє використання досягло вашого денного бюджету для тижневого ліміту.";

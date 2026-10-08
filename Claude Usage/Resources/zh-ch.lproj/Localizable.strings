@@ -69,7 +69,7 @@
 "menubar.5_hour_window" = "5小时滚动窗口";
 "menubar.all_models" = "所有模型";
 "menubar.weekly" = "每周";
-"popover.daily_budget.today" = "今日：%d%%，预算 %d%%";
+"popover.daily_budget.today" = "今日：剩余 %@%%，预算 %@%%";
 "menubar.anthropic_console" = "Anthropic API 控制台";
 "menubar.api_cost" = "API 费用";
 "menubar.cost_source.api" = "API";
@@ -1080,3 +1080,5 @@
 "support.popup_signature" = "Claude Usage 背后的一人团队";
 "support.popup_body" = "免费、开源、一人开发——没有广告，没有跟踪。如果它曾帮你避免烧掉会话额度，一杯咖啡就能让它继续前进。";
 "support.popup_days" = "已守护你的额度 %d 天 — 永久免费";
+"notification.daily_budget.title" = "已达每日预算";
+"notification.daily_budget.message" = "今天的用量已达到每周额度的每日预算。";

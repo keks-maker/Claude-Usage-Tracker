@@ -74,7 +74,7 @@
 "menubar.5_hour_window" = "5-hour rolling window";
 "menubar.all_models" = "All models";
 "menubar.weekly" = "Weekly";
-"popover.daily_budget.today" = "today: %d%% of %d%%";
+"popover.daily_budget.today" = "today: %@%% left of %@%%";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Used";
 "menubar.remaining" = "Remaining";
@@ -1090,3 +1090,5 @@
 "support.popup_signature" = "the one-person team behind Claude Usage";
 "support.popup_body" = "Free, open source, built by one person — no ads, no tracking. If it has ever saved you from burning a session limit, a coffee keeps it going.";
 "support.popup_days" = "Watching your limits for %d days — always free";
+"notification.daily_budget.title" = "Daily Budget Reached";
+"notification.daily_budget.message" = "Today's usage has reached your daily budget for the weekly limit.";

@@ -77,7 +77,7 @@
 "menubar.5_hour_window" = "5시간 롤링 윈도우";
 "menubar.all_models" = "모든 모델";
 "menubar.weekly" = "주간";
-"popover.daily_budget.today" = "오늘: %d%% / 예산 %d%%";
+"popover.daily_budget.today" = "오늘: 남은 %@%% / 예산 %@%%";
 "menubar.anthropic_console" = "Anthropic API 콘솔";
 "menubar.used" = "사용됨";
 "menubar.remaining" = "남음";
@@ -1103,3 +1103,5 @@
 "support.popup_signature" = "Claude Usage를 혼자 만드는 1인 팀";
 "support.popup_body" = "무료, 오픈소스, 1인 개발 — 광고도 추적도 없습니다. 세션 한도를 태우는 걸 막아준 적이 있다면, 커피 한 잔이 개발을 이어가게 합니다.";
 "support.popup_days" = "%d일째 당신의 한도를 지키는 중 — 언제나 무료";
+"notification.daily_budget.title" = "일일 예산 도달";
+"notification.daily_budget.message" = "오늘 사용량이 주간 한도에 대한 일일 예산에 도달했습니다.";

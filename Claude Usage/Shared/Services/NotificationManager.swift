@@ -323,6 +323,28 @@ class NotificationManager: NotificationServiceProtocol {
         }
     }
 
+    /// Sends the alert that today's usage has reached the daily budget.
+    /// The identifier contains the day and profile, so one request exists per profile and day.
+    func sendDailyBudgetAlert(profileName: String, profileId: UUID, dayKey: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(profileName) - \(AlertType.dailyBudgetExceeded.title)"
+        content.body = AlertType.dailyBudgetExceeded.message(percentage: 0, resetTime: nil)
+        content.sound = .default
+        content.categoryIdentifier = "USAGE_ALERT"
+
+        let request = UNNotificationRequest(
+            identifier: "daily_budget_\(dayKey)_\(profileId.uuidString)",
+            content: content,
+            trigger: nil // Show immediately
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                LoggingService.shared.logError("Failed to send daily budget notification: \(error)")
+            }
+        }
+    }
+
     /// Clears notification tracking state for a specific profile
     func clearNotificationsForProfile(_ profileName: String) {
         sentNotifications = sentNotifications.filter { !$0.hasPrefix(profileName) }
@@ -388,6 +410,7 @@ extension NotificationManager {
         case opusCritical = "opus_critical"
         case sessionKeyExpiring = "session_key_expiring"
         case notificationsEnabled = "notifications_enabled"
+        case dailyBudgetExceeded = "daily_budget_exceeded"
 
         var title: String {
             switch self {
@@ -415,6 +438,8 @@ extension NotificationManager {
                 return "API Session Expiring"
             case .notificationsEnabled:
                 return "notification.enabled.title".localized
+            case .dailyBudgetExceeded:
+                return "notification.daily_budget.title".localized
             }
         }
 
@@ -453,6 +478,8 @@ extension NotificationManager {
                 return "Your API session key expires soon. Please re-authenticate to avoid interruption."
             case .notificationsEnabled:
                 return "notification.enabled.message".localized
+            case .dailyBudgetExceeded:
+                return "notification.daily_budget.message".localized
             }
         }
     }

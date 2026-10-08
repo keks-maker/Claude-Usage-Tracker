@@ -74,7 +74,7 @@
 "menubar.5_hour_window" = "5 saatlik kayan pencere";
 "menubar.all_models" = "Tüm modeller";
 "menubar.weekly" = "Haftalık";
-"popover.daily_budget.today" = "bugün: %d%% / %d%%";
+"popover.daily_budget.today" = "bugün: kalan %@%% / %@%%";
 "menubar.anthropic_console" = "Anthropic API Konsolu";
 "menubar.used" = "Kullanılan";
 "menubar.remaining" = "Kalan";
@@ -1086,3 +1086,5 @@
 "support.popup_signature" = "Claude Usage'ın arkasındaki tek kişilik ekip";
 "support.popup_body" = "Ücretsiz, açık kaynak, tek kişi tarafından yapıldı — reklam yok, izleme yok. Sizi bir oturum limitini yakmaktan kurtardıysa, bir kahve onu ayakta tutar.";
 "support.popup_days" = "%d gündür limitlerinizi izliyor — her zaman ücretsiz";
+"notification.daily_budget.title" = "Günlük bütçeye ulaşıldı";
+"notification.daily_budget.message" = "Bugünkü kullanım, haftalık limit için günlük bütçene ulaştı.";

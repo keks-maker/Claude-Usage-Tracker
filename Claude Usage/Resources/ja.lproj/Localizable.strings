@@ -68,7 +68,7 @@
 "menubar.5_hour_window" = "5時間ローリングウィンドウ";
 "menubar.all_models" = "すべてのモデル";
 "menubar.weekly" = "週次";
-"popover.daily_budget.today" = "今日: %d%%（目安 %d%%）";
+"popover.daily_budget.today" = "今日: 残り %@%%（目安 %@%%）";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";
@@ -1094,3 +1094,5 @@
 "support.popup_signature" = "Claude Usage を一人で作っています";
 "support.popup_body" = "無料・オープンソース・個人開発。広告もトラッキングもありません。セッション上限の浪費を防いだことがあるなら、一杯のコーヒーが開発を支えます。";
 "support.popup_days" = "あなたの上限を見守って %d 日 — ずっと無料";
+"notification.daily_budget.title" = "1日の目安に到達";
+"notification.daily_budget.message" = "今日の使用量が週間上限に対する1日の目安に達しました。";

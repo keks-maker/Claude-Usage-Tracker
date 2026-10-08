@@ -68,7 +68,7 @@
 "menubar.5_hour_window" = "5-Stunden-Gleitfenster";
 "menubar.all_models" = "Alle Modelle";
 "menubar.weekly" = "Wöchentlich";
-"popover.daily_budget.today" = "heute: %d %% von %d %%";
+"popover.daily_budget.today" = "heute: Rest %@ %% von %@ %%";
 "menubar.anthropic_console" = "Anthropic API-Konsole";
 "menubar.used" = "Verbraucht";
 "menubar.remaining" = "Verbleibend";
@@ -1094,3 +1094,5 @@
 "support.popup_signature" = "das Ein-Personen-Team hinter Claude Usage";
 "support.popup_body" = "Kostenlos, Open Source, von einer Person gebaut — ohne Werbung, ohne Tracking. Hat es dich je vor einem verbrannten Session-Limit bewahrt, hält ein Kaffee es am Leben.";
 "support.popup_days" = "Behält deine Limits seit %d Tagen im Blick — für immer kostenlos";
+"notification.daily_budget.title" = "Tagesbudget erreicht";
+"notification.daily_budget.message" = "Dein heutiger Verbrauch hat das Tagesbudget für das Wochenkontingent erreicht.";

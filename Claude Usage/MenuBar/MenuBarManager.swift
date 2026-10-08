@@ -1057,6 +1057,12 @@ class MenuBarManager: NSObject, ObservableObject {
 
                         // Daily breakdown of the weekly usage (popover)
                         WeeklyDailySnapshotStore.shared.recordUsage(newUsage, for: profile.id)
+                        DailyBudgetAlertService.shared.checkAndNotify(
+                            usage: newUsage,
+                            profileId: profile.id,
+                            profileName: profile.name,
+                            settings: profile.notificationSettings
+                        )
 
                         // Clear reset flags for next cycle
                         self.resetJustRecorded[profile.id] = (session: false, weekly: false)
@@ -1242,6 +1248,12 @@ class MenuBarManager: NSObject, ObservableObject {
                         UsageHistoryService.shared.recordSessionPeriodic(for: profileId, usage: newUsage, provider: profile.provider)
                         UsageHistoryService.shared.recordWeeklyPeriodic(for: profileId, usage: newUsage, provider: profile.provider)
                         WeeklyDailySnapshotStore.shared.recordUsage(newUsage, for: profileId)
+                        DailyBudgetAlertService.shared.checkAndNotify(
+                            usage: newUsage,
+                            profileId: profileId,
+                            profileName: profile.name,
+                            settings: profile.notificationSettings
+                        )
                     }
 
                     self.usage = newUsage

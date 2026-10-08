@@ -68,7 +68,7 @@
 "menubar.5_hour_window" = "Fenêtre glissante de 5 heures";
 "menubar.all_models" = "Tous les modèles";
 "menubar.weekly" = "Hebdomadaire";
-"popover.daily_budget.today" = "aujourd’hui : %d %% sur %d %%";
+"popover.daily_budget.today" = "aujourd’hui : reste %@ %% sur %@ %%";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilisé";
 "menubar.remaining" = "Restant";
@@ -1072,3 +1072,5 @@
 "support.popup_signature" = "l'équipe d'une seule personne derrière Claude Usage";
 "support.popup_body" = "Gratuit, open source, fait par une seule personne — sans pubs ni pistage. Si Claude Usage vous a déjà évité de griller une limite de session, un café le fait vivre.";
 "support.popup_days" = "Veille sur vos limites depuis %d jours — toujours gratuit";
+"notification.daily_budget.title" = "Budget quotidien atteint";
+"notification.daily_budget.message" = "La consommation d’aujourd’hui a atteint ton budget quotidien pour la limite hebdomadaire.";

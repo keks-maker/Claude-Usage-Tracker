@@ -290,4 +290,158 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
         XCTAssertEqual(store.snapshots(for: profileId).first?.endPercentage, 20)
     }
+
+    // MARK: - Budget Model (39 % example, dynamic budget, alert)
+
+    private func budgetAt(_ used: Double, _ y: Int, _ m: Int, _ d: Int) -> Double {
+        WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: used, now: Self.date(y, m, d, 12, 0), weeklyResetTime: resetTime, calendar: calendar)
+    }
+
+    func testDailyBudget_39PercentUsedGivesTwelvePointTwoPerDay() {
+        // Thu 2026-10-08 noon: 5 remaining days including today
+        XCTAssertEqual(budgetAt(39, 2026, 10, 8), 12.2, accuracy: 0.05)
+    }
+
+    func testDailyBudget_decreasesForFollowingDaysWhenUsageGrows() {
+        let before = budgetAt(39, 2026, 10, 8)
+        let after = budgetAt(50, 2026, 10, 8)
+        XCTAssertLessThan(after, before)
+        XCTAssertEqual(after, 10.0, accuracy: 0.05)
+    }
+
+    func testTodayBar_sixPercentOfTwelvePointTwoBudget() {
+        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 6, budget: 12.2), 0.49, accuracy: 0.01)
+        XCTAssertEqual(WeeklyDailyUsage.todayRemaining(usage: 6, budget: 12.2), 6.2, accuracy: 0.05)
+    }
+
+    func testTodayRemaining_neverNegativeAndBarNotZeroBudget() {
+        XCTAssertEqual(WeeklyDailyUsage.todayRemaining(usage: 15, budget: 12.2), 0)
+        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 3, budget: 0), 1)
+        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 0, budget: 0), 0)
+    }
+
+    func testTodayUsage_isLiveValueMinusYesterdaysEnd() {
+        let snapshots = [snapshot(2026, 10, 7, start: 30, end: 39)]
+        let usage = WeeklyDailyUsage.todayUsage(
+            snapshots: snapshots, currentWeeklyPercentage: 45,
+            now: Self.date(2026, 10, 8, 12, 0), weeklyResetTime: resetTime, calendar: calendar
+        )
+        XCTAssertEqual(usage ?? -1, 6, accuracy: 0.0001)
+    }
+
+    func testDailyBudgetAlert_firesOnceOnDayBudgetIsReached() {
+        let suite = "DailyBudgetAlertTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        var dispatched: [String] = []
+        let service = DailyBudgetAlertService(defaults: defaults, snapshotStore: store) { _, _, dayKey in
+            dispatched.append(dayKey)
+        }
+        let profileId = UUID()
+        let settings = NotificationSettings(
+            enabled: true, threshold75Enabled: true, threshold90Enabled: true, threshold95Enabled: true,
+            soundName: "default", customThresholds: []
+        )
+        func usage(_ percentage: Double) -> ClaudeUsage {
+            var usage = ClaudeUsage.empty
+            usage.weeklyPercentage = percentage
+            usage.weeklyResetTime = resetTime
+            usage.weeklyResetIsFromAPI = true
+            return usage
+        }
+        func observe(_ percentage: Double, _ y: Int, _ m: Int, _ d: Int, _ h: Int) -> Bool {
+            let now = Self.date(y, m, d, h, 0)
+            store.record(percentage: percentage, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
+            return service.checkAndNotify(usage: usage(percentage), profileId: profileId, profileName: "Test", settings: settings, now: now, calendar: calendar)
+        }
+
+        // Wed: 39 % at end of day. Thu: 45 % -> 6 points used, budget 11.0, not reached
+        store.record(percentage: 39, weeklyResetTime: resetTime, for: profileId, now: Self.date(2026, 10, 7, 20, 0), calendar: calendar)
+        XCTAssertFalse(observe(45, 2026, 10, 8, 12))
+        // Thu: 50 % -> 11 points used, budget 10.0 -> reached, alert
+        XCTAssertTrue(observe(50, 2026, 10, 8, 12))
+        // Same day again: no second alert
+        XCTAssertFalse(observe(51, 2026, 10, 8, 12))
+        XCTAssertEqual(dispatched, ["2026-10-08"])
+        // Next day, budget reached again: one more alert
+        XCTAssertTrue(observe(75, 2026, 10, 9, 12))
+        XCTAssertEqual(dispatched, ["2026-10-08", "2026-10-09"])
+    }
+
+    func testDailyBudgetAlert_disabledNotificationsDoNotFire() {
+        let suite = "DailyBudgetAlertDisabledTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        var dispatched = 0
+        let service = DailyBudgetAlertService(defaults: defaults, snapshotStore: WeeklyDailySnapshotStore(defaults: defaults)) { _, _, _ in
+            dispatched += 1
+        }
+        var usage = ClaudeUsage.empty
+        usage.weeklyPercentage = 99
+        usage.weeklyResetTime = resetTime
+        usage.weeklyResetIsFromAPI = true
+        let settings = NotificationSettings(
+            enabled: false, threshold75Enabled: true, threshold90Enabled: true, threshold95Enabled: true,
+            soundName: "default", customThresholds: []
+        )
+        let fired = service.checkAndNotify(usage: usage, profileId: UUID(), profileName: "Test", settings: settings,
+                                           now: Self.date(2026, 10, 8, 12, 0), calendar: calendar)
+        XCTAssertFalse(fired)
+        XCTAssertEqual(dispatched, 0)
+    }
+
+    func testStoredBudget_savedWithSnapshotAndUpdatedOnLaterFetch() {
+        let wedBudget = budgetAt(39, 2026, 10, 7)
+        let snapshots = [DailyWeeklySnapshot(
+            dayStart: calendar.startOfDay(for: Self.date(2026, 10, 7, 12, 0)),
+            weekResetTime: resetTime, startPercentage: 39, endPercentage: 39, dailyBudget: wedBudget
+        )]
+        let budgets = WeeklyDailyUsage.storedBudgets(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
+        let wedIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: Self.date(2026, 10, 7, 12, 0)) }!
+        XCTAssertEqual(budgets[wedIndex] ?? -1, wedBudget, accuracy: 0.0001)
+        // Days without snapshot stay nil, not 0
+        XCTAssertEqual(budgets.compactMap { $0 }.count, 1)
+    }
+
+    func testStore_recordStoresBudgetOfTheDay() {
+        let suite = "WeeklyDailyBudgetStoreTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        let profileId = UUID()
+        let now = Self.date(2026, 10, 7, 12, 0)
+        store.record(percentage: 39, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
+        store.record(percentage: 50, weeklyResetTime: resetTime, for: profileId, now: now.addingTimeInterval(3600), calendar: calendar)
+
+        let stored = store.snapshots(for: profileId)
+        XCTAssertEqual(stored.count, 1)
+        // Budget of the last fetch of the day (13:00 is after the 12:59 reset time, so one day less)
+        let lastBudget = WeeklyDailyUsage.dailyBudget(currentWeeklyPercentage: 50, now: now.addingTimeInterval(3600), weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(stored[0].dailyBudget ?? -1, lastBudget, accuracy: 0.0001)
+    }
+
+    @MainActor
+    func testDailySnapshot_legacyJSONWithoutBudgetDecodes() throws {
+        let snapshot = DailyWeeklySnapshot(
+            dayStart: calendar.startOfDay(for: Self.date(2026, 10, 7, 12, 0)),
+            weekResetTime: resetTime, startPercentage: 10, endPercentage: 20, dailyBudget: 12.2
+        )
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as? [String: Any] ?? [:]
+        XCTAssertNotNil(object["dailyBudget"])
+        object.removeValue(forKey: "dailyBudget")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder().decode(DailyWeeklySnapshot.self, from: legacy)
+        XCTAssertNil(decoded.dailyBudget)
+        XCTAssertEqual(decoded.startPercentage, 10)
+        XCTAssertEqual(decoded.endPercentage, 20)
+    }
 }

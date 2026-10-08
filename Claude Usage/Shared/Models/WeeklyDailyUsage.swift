@@ -18,6 +18,9 @@ struct DailyWeeklySnapshot: Codable, Equatable {
     let startPercentage: Double
     /// Weekly percentage at the most recent fetch of the day
     var endPercentage: Double
+    /// Daily budget that applied at the most recent fetch of the day.
+    /// Optional so that snapshots stored before this field existed still decode.
+    var dailyBudget: Double?
 }
 
 enum WeeklyDailyUsage {
@@ -84,15 +87,24 @@ enum WeeklyDailyUsage {
         }
 
         var result = existing.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
+        // The budget of the last fetch of the day is kept for the day's column
+        let budget = dailyBudget(
+            currentWeeklyPercentage: percentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
 
         if let index = result.firstIndex(where: { calendar.isDate($0.dayStart, inSameDayAs: now) }) {
             result[index].endPercentage = percentage
+            result[index].dailyBudget = budget
         } else {
             result.append(DailyWeeklySnapshot(
                 dayStart: calendar.startOfDay(for: now),
                 weekResetTime: weeklyResetTime,
                 startPercentage: percentage,
-                endPercentage: percentage
+                endPercentage: percentage,
+                dailyBudget: budget
             ))
         }
         return result
@@ -136,6 +148,76 @@ enum WeeklyDailyUsage {
         calendar: Calendar
     ) -> DailyWeeklySnapshot? {
         snapshots.first { calendar.isDate($0.dayStart, inSameDayAs: now) }
+    }
+
+    /// The daily budget stored for each column, aligned with `dayStarts`.
+    /// `nil` for days without snapshot or snapshots stored without a budget.
+    static func storedBudgets(
+        snapshots: [DailyWeeklySnapshot],
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> [Double?] {
+        let days = dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        let weekSnapshots = snapshots.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
+        return days.map { day in
+            weekSnapshots.first { calendar.isDate($0.dayStart, inSameDayAs: day) }?.dailyBudget
+        }
+    }
+
+    /// Baseline for today's usage: the previous day's end value, or today's first
+    /// value if the previous day has no snapshot. `nil` if today has no snapshot yet.
+    static func todayBaseline(
+        snapshots: [DailyWeeklySnapshot],
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> Double? {
+        let days = dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        guard let index = days.firstIndex(where: { calendar.isDate($0, inSameDayAs: now) }) else { return nil }
+        let weekSnapshots = snapshots.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
+
+        if index > 0,
+           let previous = weekSnapshots.first(where: { calendar.isDate($0.dayStart, inSameDayAs: days[index - 1]) }) {
+            return previous.endPercentage
+        }
+        return weekSnapshots.first { calendar.isDate($0.dayStart, inSameDayAs: now) }?.startPercentage
+    }
+
+    /// Today's weekly usage in percentage points: the live weekly value minus the
+    /// baseline. `nil` if `now` is not on one of the columns.
+    static func todayUsage(
+        snapshots: [DailyWeeklySnapshot],
+        currentWeeklyPercentage: Double,
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> Double? {
+        guard isInColumns(now, weeklyResetTime: weeklyResetTime, calendar: calendar),
+              currentWeeklyPercentage.isFinite else { return nil }
+        let current = min(100, max(0, currentWeeklyPercentage))
+        let baseline = todayBaseline(
+            snapshots: snapshots,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        ) ?? current
+        return max(0, current - baseline)
+    }
+
+    /// True once today's usage has reached today's daily budget.
+    static func isDailyBudgetExceeded(todayUsage: Double, budget: Double) -> Bool {
+        todayUsage >= budget
+    }
+
+    /// Height of today's bar as a fraction of the daily budget (0 to 1, values above 1 possible).
+    static func todayBarFraction(usage: Double, budget: Double) -> Double {
+        guard budget > 0 else { return usage > 0 ? 1 : 0 }
+        return usage / budget
+    }
+
+    /// Budget still available today, never below 0.
+    static func todayRemaining(usage: Double, budget: Double) -> Double {
+        max(0, budget - usage)
     }
 
     // MARK: - Daily Budget

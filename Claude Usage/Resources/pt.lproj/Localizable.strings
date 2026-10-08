@@ -66,7 +66,7 @@
 "menubar.5_hour_window" = "Janela móvel de 5 horas";
 "menubar.all_models" = "Todos os modelos";
 "menubar.weekly" = "Semanal";
-"popover.daily_budget.today" = "hoje: %d%% de %d%%";
+"popover.daily_budget.today" = "hoje: resta %@%% de %@%%";
 "menubar.anthropic_console" = "Console da API Anthropic";
 "menubar.used" = "Usado";
 "menubar.remaining" = "Restante";
@@ -1094,3 +1094,5 @@
 "support.popup_signature" = "a equipa de uma só pessoa por trás do Claude Usage";
 "support.popup_body" = "Grátis, open source, feita por uma só pessoa — sem anúncios nem rastreio. Se já te salvou de queimar um limite de sessão, um café mantém-na viva.";
 "support.popup_days" = "A vigiar os teus limites há %d dias — sempre grátis";
+"notification.daily_budget.title" = "Orçamento diário atingido";
+"notification.daily_budget.message" = "A utilização de hoje atingiu o seu orçamento diário do limite semanal.";
