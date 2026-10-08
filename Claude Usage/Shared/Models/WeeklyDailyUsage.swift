@@ -116,8 +116,9 @@ enum WeeklyDailyUsage {
     /// Usage per day of the weekly window, aligned with `dayStarts`. Days without
     /// any snapshot are `nil`.
     ///
-    /// A day's usage is its end value minus the previous day's end value. If the
-    /// previous day has no snapshot, the day's first value is the baseline instead.
+    /// A day's usage is its end value minus the end value of the closest earlier day
+    /// that has a snapshot (so a gap does not lose usage). If there is none, the day's
+    /// first value is the baseline instead.
     static func dailyUsage(
         snapshots: [DailyWeeklySnapshot],
         weeklyResetTime: Date,
@@ -133,7 +134,7 @@ enum WeeklyDailyUsage {
         return days.indices.map { index in
             guard let current = snapshot(for: days[index]) else { return nil }
             let baseline: Double
-            if index > 0, let previous = snapshot(for: days[index - 1]) {
+            if let previous = days[..<index].reversed().lazy.compactMap({ snapshot(for: $0) }).first {
                 baseline = previous.endPercentage
             } else {
                 baseline = current.startPercentage
@@ -165,8 +166,10 @@ enum WeeklyDailyUsage {
         }
     }
 
-    /// Baseline for today's usage: the previous day's end value, or today's first
-    /// value if the previous day has no snapshot. `nil` if today has no snapshot yet.
+    /// Baseline for today's usage: the end value of the closest earlier day with a
+    /// snapshot, or today's first value if there is none (then the baseline is only
+    /// an estimate, see `isTodayBaselineReliable`). `nil` if today has no snapshot yet
+    /// and no earlier day exists.
     static func todayBaseline(
         snapshots: [DailyWeeklySnapshot],
         now: Date,
@@ -177,11 +180,37 @@ enum WeeklyDailyUsage {
         guard let index = days.firstIndex(where: { calendar.isDate($0, inSameDayAs: now) }) else { return nil }
         let weekSnapshots = snapshots.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
 
-        if index > 0,
-           let previous = weekSnapshots.first(where: { calendar.isDate($0.dayStart, inSameDayAs: days[index - 1]) }) {
+        if let previous = earlierSnapshot(before: index, days: days, in: weekSnapshots, calendar: calendar) {
             return previous.endPercentage
         }
         return weekSnapshots.first { calendar.isDate($0.dayStart, inSameDayAs: now) }?.startPercentage
+    }
+
+    /// True if today's baseline comes from an earlier day's snapshot. Without one the
+    /// baseline is only the first fetch of the day (or the live value), which may already
+    /// include usage from earlier today, so budget and usage are unknown.
+    static func isTodayBaselineReliable(
+        snapshots: [DailyWeeklySnapshot],
+        now: Date,
+        weeklyResetTime: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let days = dayStarts(weeklyResetTime: weeklyResetTime, calendar: calendar)
+        guard let index = days.firstIndex(where: { calendar.isDate($0, inSameDayAs: now) }) else { return false }
+        let weekSnapshots = snapshots.filter { isSameWeek($0.weekResetTime, weeklyResetTime) }
+        return earlierSnapshot(before: index, days: days, in: weekSnapshots, calendar: calendar) != nil
+    }
+
+    /// The snapshot of the closest day before column `index`, if any.
+    private static func earlierSnapshot(
+        before index: Int,
+        days: [Date],
+        in weekSnapshots: [DailyWeeklySnapshot],
+        calendar: Calendar
+    ) -> DailyWeeklySnapshot? {
+        days[..<index].reversed().lazy.compactMap { day in
+            weekSnapshots.first { calendar.isDate($0.dayStart, inSameDayAs: day) }
+        }.first
     }
 
     /// Today's weekly usage in percentage points: the live weekly value minus the
@@ -205,15 +234,10 @@ enum WeeklyDailyUsage {
         return max(0, current - baseline)
     }
 
-    /// True once today's usage has reached today's daily budget.
+    /// True once usage has reached the daily budget. A budget of 0 never counts
+    /// as exceeded: there was nothing to exceed.
     static func isDailyBudgetExceeded(todayUsage: Double, budget: Double) -> Bool {
-        todayUsage >= budget
-    }
-
-    /// Height of today's bar as a fraction of the daily budget (0 to 1, values above 1 possible).
-    static func todayBarFraction(usage: Double, budget: Double) -> Double {
-        guard budget > 0 else { return usage > 0 ? 1 : 0 }
-        return usage / budget
+        budget > 0 && todayUsage >= budget
     }
 
     /// Budget still available today, never below 0.
@@ -223,9 +247,10 @@ enum WeeklyDailyUsage {
 
     /// Fill level of a day's budget bar: the share of the day's budget still left (0 to 1).
     /// The bar's full height is the budget, so 0 usage gives 1 and usage at or above the budget gives 0.
-    /// `nil` if the usage or the budget is unknown, or the budget is not positive.
+    /// A budget of 0 is already used up (0). `nil` if the usage or the budget is unknown or the budget is negative.
     static func dayRemainingFraction(usage: Double?, budget: Double?) -> Double? {
-        guard let usage, let budget, usage.isFinite, budget.isFinite, budget > 0 else { return nil }
+        guard let usage, let budget, usage.isFinite, budget.isFinite, budget >= 0 else { return nil }
+        guard budget > 0 else { return 0 }
         return min(1, max(0, (budget - usage) / budget))
     }
 

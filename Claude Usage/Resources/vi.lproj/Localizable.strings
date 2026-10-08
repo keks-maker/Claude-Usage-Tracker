@@ -75,6 +75,7 @@
 "menubar.all_models" = "Tất cả mô hình";
 "menubar.weekly" = "Hàng tuần";
 "popover.daily_budget.today" = "hôm nay: còn %@%% trên %@%%";
+"popover.daily_budget.no_data" = "chưa có dữ liệu";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Đã dùng";
 "menubar.remaining" = "Còn lại";

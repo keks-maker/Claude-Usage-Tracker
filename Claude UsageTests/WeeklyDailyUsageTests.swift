@@ -79,8 +79,8 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertNil(usage[2])
     }
 
-    func testDailyUsage_missingDayUsesOwnFirstValueAsBaseline() {
-        // Wednesday has no snapshot: Thursday's baseline is its own first value
+    func testDailyUsage_gapUsesLastEarlierSnapshotAsBaseline() {
+        // Wednesday has no snapshot: Thursday's baseline is Tuesday's end value (12), no usage is lost
         let snapshots = [
             snapshot(2026, 10, 6, start: 10, end: 12),
             snapshot(2026, 10, 8, start: 20, end: 25)
@@ -89,7 +89,7 @@ final class WeeklyDailyUsageTests: XCTestCase {
 
         XCTAssertEqual(usage[0] ?? -1, 2, accuracy: 0.0001)
         XCTAssertNil(usage[1])
-        XCTAssertEqual(usage[2] ?? -1, 5, accuracy: 0.0001)
+        XCTAssertEqual(usage[2] ?? -1, 13, accuracy: 0.0001)
     }
 
     func testDailyUsage_noSnapshotsYieldsNilForEveryDay() {
@@ -336,7 +336,6 @@ final class WeeklyDailyUsageTests: XCTestCase {
         ) ?? -1
         XCTAssertEqual(budget, 12.2, accuracy: 0.0001)
         XCTAssertEqual(usage, 6, accuracy: 0.0001)
-        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: usage, budget: budget), 0.49, accuracy: 0.01)
         XCTAssertEqual(WeeklyDailyUsage.todayRemaining(usage: usage, budget: budget), 6.2, accuracy: 0.05)
         XCTAssertFalse(WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: 10.2, budget: budget))
         XCTAssertTrue(WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: 12.2, budget: budget))
@@ -352,15 +351,9 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(after, 12.5, accuracy: 0.0001)
     }
 
-    func testTodayBar_sixPercentOfTwelvePointTwoBudget() {
-        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 6, budget: 12.2), 0.49, accuracy: 0.01)
+    func testTodayRemaining_neverNegative() {
         XCTAssertEqual(WeeklyDailyUsage.todayRemaining(usage: 6, budget: 12.2), 6.2, accuracy: 0.05)
-    }
-
-    func testTodayRemaining_neverNegativeAndBarNotZeroBudget() {
         XCTAssertEqual(WeeklyDailyUsage.todayRemaining(usage: 15, budget: 12.2), 0)
-        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 3, budget: 0), 1)
-        XCTAssertEqual(WeeklyDailyUsage.todayBarFraction(usage: 0, budget: 0), 0)
     }
 
     func testTodayUsage_isLiveValueMinusYesterdaysEnd() {
@@ -537,10 +530,10 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 15, budget: 12.2), 0)
     }
 
-    func testDayRemainingFraction_nilWithoutUsageBudgetOrPositiveBudget() {
+    func testDayRemainingFraction_nilWithoutUsageOrValidBudget() {
         XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: nil, budget: 12.2))
         XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: 3, budget: nil))
-        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: 3, budget: 0))
+        XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: 3, budget: -1))
     }
 
     func testDayRemainingFraction_pastDayUsesStoredBudget() {
@@ -568,5 +561,69 @@ final class WeeklyDailyUsageTests: XCTestCase {
         let usages = WeeklyDailyUsage.dailyUsage(snapshots: snapshots, weeklyResetTime: resetTime, calendar: calendar)
         XCTAssertNil(usages[0])
         XCTAssertNil(WeeklyDailyUsage.dayRemainingFraction(usage: usages[0], budget: 10))
+    }
+
+    // MARK: - Reliable Baseline, Future Days, Budget 0, Gaps
+
+    func testTodayBaseline_reliableOnlyWithEarlierSnapshot() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        func reliable(_ snaps: [DailyWeeklySnapshot]) -> Bool {
+            WeeklyDailyUsage.isTodayBaselineReliable(snapshots: snaps, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        }
+        // Only today's first fetch: estimated
+        XCTAssertFalse(reliable([]))
+        XCTAssertFalse(reliable([snapshot(2026, 10, 8, start: 39, end: 45)]))
+        // Previous day present (app ran over midnight, first fetch exactly at day start): safe
+        XCTAssertTrue(reliable([snapshot(2026, 10, 7, start: 30, end: 39), snapshot(2026, 10, 8, start: 39, end: 45)]))
+        // Snapshot of another week does not count
+        XCTAssertFalse(reliable([snapshot(2026, 10, 7, start: 30, end: 39, reset: resetTime.addingTimeInterval(-7 * 86400))]))
+    }
+
+    func testTodayBaseline_gapFallsBackToLastEarlierSnapshot() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let snaps = [snapshot(2026, 10, 6, start: 10, end: 20), snapshot(2026, 10, 8, start: 30, end: 31)]
+        XCTAssertEqual(WeeklyDailyUsage.todayBaseline(snapshots: snaps, now: now, weeklyResetTime: resetTime, calendar: calendar) ?? -1, 20, accuracy: 0.0001)
+        XCTAssertTrue(WeeklyDailyUsage.isTodayBaselineReliable(snapshots: snaps, now: now, weeklyResetTime: resetTime, calendar: calendar))
+        XCTAssertEqual(WeeklyDailyUsage.todayUsage(snapshots: snaps, currentWeeklyPercentage: 35, now: now, weeklyResetTime: resetTime, calendar: calendar) ?? -1, 15, accuracy: 0.0001)
+    }
+
+    func testFutureDay_fullBudgetFillWithRestBudget() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        let rest = WeeklyDailyUsage.restDailyBudget(currentWeeklyPercentage: 39, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        XCTAssertEqual(rest, 15.25, accuracy: 0.0001)
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: rest), 1)
+    }
+
+    func testBudgetZero_isEmptyAndNeverExceeded() {
+        XCTAssertFalse(WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: 0, budget: 0))
+        XCTAssertFalse(WeeklyDailyUsage.isDailyBudgetExceeded(todayUsage: 3, budget: 0))
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: 0), 0)
+    }
+
+    func testDailyBudgetAlert_estimatedBaselineDoesNotFire() {
+        let suite = "DailyBudgetAlertEstimatedTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = WeeklyDailySnapshotStore(defaults: defaults)
+        var dispatched = 0
+        let service = DailyBudgetAlertService(defaults: defaults, snapshotStore: store) { _, _, _ in dispatched += 1 }
+        let profileId = UUID()
+        let settings = NotificationSettings(
+            enabled: true, threshold75Enabled: true, threshold90Enabled: true, threshold95Enabled: true,
+            soundName: "default", customThresholds: []
+        )
+        var usage = ClaudeUsage.empty
+        usage.weeklyResetTime = resetTime
+        usage.weeklyResetIsFromAPI = true
+        // No snapshot of an earlier day: first fetch at 39 %, later 80 % would exceed any budget
+        for (pct, hour) in [(39.0, 9), (80.0, 12)] {
+            let now = Self.date(2026, 10, 8, hour, 0)
+            store.record(percentage: pct, weeklyResetTime: resetTime, for: profileId, now: now, calendar: calendar)
+            usage.weeklyPercentage = pct
+            XCTAssertFalse(service.checkAndNotify(usage: usage, profileId: profileId, profileName: "Test", settings: settings, now: now, calendar: calendar))
+        }
+        XCTAssertEqual(dispatched, 0)
     }
 }

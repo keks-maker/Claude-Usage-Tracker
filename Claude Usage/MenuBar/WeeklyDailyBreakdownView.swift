@@ -46,6 +46,18 @@ struct WeeklyDailyBreakdownView: View {
             weeklyResetTime: weeklyResetTime,
             calendar: calendar
         )
+        let baselineReliable = WeeklyDailyUsage.isTodayBaselineReliable(
+            snapshots: snapshots,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
+        let restBudget = WeeklyDailyUsage.restDailyBudget(
+            currentWeeklyPercentage: weeklyPercentage,
+            now: now,
+            weeklyResetTime: weeklyResetTime,
+            calendar: calendar
+        )
         let budget = WeeklyDailyUsage.todayBudget(
             snapshots: snapshots,
             currentWeeklyPercentage: weeklyPercentage,
@@ -58,8 +70,10 @@ struct WeeklyDailyBreakdownView: View {
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(days.indices, id: \.self) { index in
                     let isToday = index == todayIndex
-                    let usage = isToday ? todayUsage : usages[index]
-                    let dayBudget: Double? = isToday ? budget : storedBudgets[index]
+                    let isFuture = todayIndex.map { index > $0 } ?? false
+                    // Today without a reliable day-start value is unknown, not "nothing used"
+                    let usage: Double? = isToday ? (baselineReliable ? todayUsage : nil) : (isFuture ? 0 : usages[index])
+                    let dayBudget: Double? = isToday ? (baselineReliable ? budget : nil) : (isFuture ? restBudget : storedBudgets[index])
                     dayColumn(
                         day: days[index],
                         remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
@@ -70,7 +84,13 @@ struct WeeklyDailyBreakdownView: View {
             }
             .frame(height: barAreaHeight + 16)
 
-            if let todayUsage {
+            if todayUsage != nil, !baselineReliable {
+                Text("popover.daily_budget.no_data".localized)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            } else if let todayUsage {
                 let remaining = WeeklyDailyUsage.todayRemaining(usage: todayUsage, budget: budget)
                 Text("popover.daily_budget.today".localized(with: formatPoints(remaining), formatPoints(budget)))
                     .font(.caption2)
@@ -117,6 +137,7 @@ struct WeeklyDailyBreakdownView: View {
 
     /// Frame = daily budget (full height). Fill = budget still left, emptying from the top as usage grows.
     /// Dashed frame without fill when the day has no data or no budget is known.
+    /// A budget of 0 gives a solid, empty frame (already used up).
     private func budgetBar(remainingFraction: Double?, isOverBudget: Bool) -> some View {
         let frameColor = isOverBudget ? Color.orange : Color.secondary
         return ZStack(alignment: .bottom) {

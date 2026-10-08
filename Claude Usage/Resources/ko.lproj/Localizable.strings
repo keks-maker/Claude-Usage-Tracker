@@ -78,6 +78,7 @@
 "menubar.all_models" = "모든 모델";
 "menubar.weekly" = "주간";
 "popover.daily_budget.today" = "오늘: 남은 %@%% / 예산 %@%%";
+"popover.daily_budget.no_data" = "아직 데이터 없음";
 "menubar.anthropic_console" = "Anthropic API 콘솔";
 "menubar.used" = "사용됨";
 "menubar.remaining" = "남음";

@@ -54,6 +54,13 @@ final class DailyBudgetAlertService {
               usage.weeklyResetTime > now else { return false }
 
         let snapshots = snapshotStore.snapshots(for: profileId)
+        // Without an earlier day's snapshot the day-start value is only an estimate: no alert
+        guard WeeklyDailyUsage.isTodayBaselineReliable(
+            snapshots: snapshots,
+            now: now,
+            weeklyResetTime: usage.weeklyResetTime,
+            calendar: calendar
+        ) else { return false }
         guard let todayUsage = WeeklyDailyUsage.todayUsage(
             snapshots: snapshots,
             currentWeeklyPercentage: usage.weeklyPercentage,

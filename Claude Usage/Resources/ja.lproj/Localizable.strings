@@ -69,6 +69,7 @@
 "menubar.all_models" = "すべてのモデル";
 "menubar.weekly" = "週次";
 "popover.daily_budget.today" = "今日: 残り %@%%（目安 %@%%）";
+"popover.daily_budget.no_data" = "データなし（取得待ち）";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";

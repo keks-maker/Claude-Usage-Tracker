@@ -75,6 +75,7 @@
 "menubar.all_models" = "Tüm modeller";
 "menubar.weekly" = "Haftalık";
 "popover.daily_budget.today" = "bugün: kalan %@%% / %@%%";
+"popover.daily_budget.no_data" = "henüz veri yok";
 "menubar.anthropic_console" = "Anthropic API Konsolu";
 "menubar.used" = "Kullanılan";
 "menubar.remaining" = "Kalan";
