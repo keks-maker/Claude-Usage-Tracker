@@ -117,7 +117,9 @@ struct WeeklyDailyBreakdownView: View {
         )[safe: todayIndex]
 
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .bottom, spacing: 4) {
+            // No spacing: each column carries 2 pt padding per side inside its hover area, so the gaps
+            // between columns are hoverable too and the detail line does not flicker while moving across
+            HStack(alignment: .bottom, spacing: 0) {
                 ForEach(days.indices, id: \.self) { index in
                     let isToday = index == todayIndex
                     let usage = columns[index].usage
@@ -133,7 +135,8 @@ struct WeeklyDailyBreakdownView: View {
                         isEstimatedFuture: columns[index].isEstimated && (todayIndex.map { index > $0 } ?? false),
                         color: WeeklyDayPalette.color(for: index)
                     )
-                    // Whole column incl. weekday label is the hover area
+                    // Whole column incl. weekday label and the half gaps to its neighbors is the hover area
+                    .padding(.horizontal, 2)
                     .contentShape(Rectangle())
                     .onHover { inside in
                         if inside {
@@ -147,6 +150,7 @@ struct WeeklyDailyBreakdownView: View {
                     .accessibilityLabel(text.full)
                 }
             }
+            .padding(.horizontal, -2)
             .frame(height: barAreaHeight + 16)
 
             detailRow(
@@ -159,6 +163,7 @@ struct WeeklyDailyBreakdownView: View {
             )
         }
         .padding(.vertical, 4)
+        .onDisappear { hoveredIndex = nil }
     }
 
     /// Line under the columns: the hovered column's detail, otherwise today's line.
@@ -176,6 +181,8 @@ struct WeeklyDailyBreakdownView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let shownIndex, days.indices.contains(shownIndex), columns.indices.contains(shownIndex) {
                 let detail = WeeklyDailyUsage.columnDetail(columns[shownIndex], day: days[shownIndex], now: now, calendar: calendar)
+                // Without hover, today's line is hidden when today has no data (as before)
+                if hoveredIndex != nil || detail != .noData {
                 let text = detailText(detail, day: days[shownIndex], todayLimit: todayLimit)
                 // Standard line (nothing hovered) stays quiet; a hovered column gets its weekday in bold
                 let showPrefix = hoveredIndex != nil
@@ -192,6 +199,7 @@ struct WeeklyDailyBreakdownView: View {
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                }
                 }
             }
         }

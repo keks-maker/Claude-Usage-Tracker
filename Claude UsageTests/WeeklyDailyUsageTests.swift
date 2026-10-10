@@ -720,6 +720,28 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertEqual(result[0], .noData)
     }
 
+    func testColumnDetail_pastDayWithUsageButNoBudgetIsNoData() {
+        let value = WeeklyDailyUsage.ColumnValue(usage: 3, budget: nil)
+        let day = Self.date(2026, 10, 6, 0, 0)
+        XCTAssertEqual(WeeklyDailyUsage.columnDetail(value, day: day, now: Self.date(2026, 10, 8, 12, 0), calendar: calendar), .noData)
+    }
+
+    func testColumnDetail_pastDayWithBudgetZeroIsPastAndEmpty() {
+        let value = WeeklyDailyUsage.ColumnValue(usage: 0, budget: 0)
+        let day = Self.date(2026, 10, 6, 0, 0)
+        XCTAssertEqual(WeeklyDailyUsage.columnDetail(value, day: day, now: Self.date(2026, 10, 8, 12, 0), calendar: calendar), .past(usage: 0, budget: 0))
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 0, budget: 0), 0)
+    }
+
+    func testColumnDetail_fridayExample_usedFourOfTwelveRestEight() {
+        // Start 52, budget 12, end 56 -> used 4, rest 8, fill 2/3
+        let value = WeeklyDailyUsage.ColumnValue(usage: 56 - 52, budget: 12)
+        let day = Self.date(2026, 10, 9, 0, 0)
+        let detail = WeeklyDailyUsage.columnDetail(value, day: day, now: Self.date(2026, 10, 11, 12, 0), calendar: calendar)
+        XCTAssertEqual(detail, .past(usage: 4, budget: 12))
+        XCTAssertEqual(WeeklyDailyUsage.dayRemainingFraction(usage: 4, budget: 12) ?? -1, 2.0 / 3.0, accuracy: 0.0001)
+    }
+
     func testColumnDetail_todayReportsRemainingOfBudget() {
         let now = Self.date(2026, 10, 8, 12, 0)
         var wed = snapshot(2026, 10, 7, start: 30, end: 39)
