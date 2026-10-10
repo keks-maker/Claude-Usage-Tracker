@@ -307,6 +307,36 @@ enum WeeklyDailyUsage {
         }
     }
 
+    // MARK: - Column Detail
+
+    /// What the detail line of one column explains.
+    enum ColumnDetail: Equatable {
+        /// Past day with stored data: `usage` of `budget` was used; the rest was spread over the following days.
+        case past(usage: Double, budget: Double)
+        /// Past day (or today) without usable data.
+        case noData
+        /// Today: points left of the day's budget.
+        case today(remaining: Double, budget: Double, isEstimated: Bool)
+        /// Day after today: the budget it will get.
+        case future(budget: Double, isEstimated: Bool)
+    }
+
+    /// Detail kind and numbers of one column, derived from its `ColumnValue`.
+    static func columnDetail(_ value: ColumnValue, day: Date, now: Date, calendar: Calendar) -> ColumnDetail {
+        let today = calendar.startOfDay(for: now)
+        let isToday = calendar.isDate(day, inSameDayAs: today)
+        if day > today && !isToday {
+            guard let budget = value.budget, budget.isFinite else { return .noData }
+            return .future(budget: budget, isEstimated: value.isEstimated)
+        }
+        guard let usage = value.usage, let budget = value.budget,
+              usage.isFinite, budget.isFinite, budget >= 0 else { return .noData }
+        if isToday {
+            return .today(remaining: todayRemaining(usage: usage, budget: budget), budget: budget, isEstimated: value.isEstimated)
+        }
+        return .past(usage: usage, budget: budget)
+    }
+
     // MARK: - Budget End Marker
 
     /// Where today's daily budget ends on the weekly scale.

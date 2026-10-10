@@ -696,6 +696,61 @@ final class WeeklyDailyUsageTests: XCTestCase {
         XCTAssertFalse(cols[6].isEstimated)
     }
 
+    // MARK: - Column Detail
+
+    private func details(now: Date, snapshots: [DailyWeeklySnapshot], current: Double) -> [WeeklyDailyUsage.ColumnDetail] {
+        let days = WeeklyDailyUsage.dayStarts(weeklyResetTime: resetTime, calendar: calendar)
+        let cols = WeeklyDailyUsage.columnValues(snapshots: snapshots, currentWeeklyPercentage: current, now: now, weeklyResetTime: resetTime, calendar: calendar)
+        return days.indices.map { WeeklyDailyUsage.columnDetail(cols[$0], day: days[$0], now: now, calendar: calendar) }
+    }
+
+    func testColumnDetail_pastDayWithDataReportsUsageOfBudget() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        var wed = snapshot(2026, 10, 7, start: 30, end: 39)
+        wed.dailyBudget = 10
+        let result = details(now: now, snapshots: [wed], current: 45)
+        XCTAssertEqual(result[1], .past(usage: 9, budget: 10))
+    }
+
+    func testColumnDetail_pastDayWithoutDataIsNoData() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        var wed = snapshot(2026, 10, 7, start: 30, end: 39)
+        wed.dailyBudget = 10
+        let result = details(now: now, snapshots: [wed], current: 45)
+        XCTAssertEqual(result[0], .noData)
+    }
+
+    func testColumnDetail_todayReportsRemainingOfBudget() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        var wed = snapshot(2026, 10, 7, start: 30, end: 39)
+        wed.dailyBudget = 10
+        let result = details(now: now, snapshots: [wed], current: 45)
+        guard case let .today(remaining, budget, isEstimated) = result[2] else { return XCTFail("expected today") }
+        XCTAssertEqual(remaining, 6.2, accuracy: 0.0001)
+        XCTAssertEqual(budget, 12.2, accuracy: 0.0001)
+        XCTAssertFalse(isEstimated)
+    }
+
+    func testColumnDetail_futureDayReportsBudget() {
+        let now = Self.date(2026, 10, 8, 12, 0)
+        var wed = snapshot(2026, 10, 7, start: 30, end: 39)
+        wed.dailyBudget = 10
+        let result = details(now: now, snapshots: [wed], current: 45)
+        guard case let .future(budget, isEstimated) = result[3] else { return XCTFail("expected future") }
+        XCTAssertGreaterThan(budget, 0)
+        XCTAssertFalse(isEstimated)
+    }
+
+    func testColumnDetail_estimatedTodayAndFutureCarryTheFlag() {
+        let now = Self.date(2026, 10, 8, 15, 0)
+        let snaps = [snapshot(2026, 10, 8, start: 40, end: 40)]
+        let result = details(now: now, snapshots: snaps, current: 43)
+        guard case let .today(_, _, todayEstimated) = result[2] else { return XCTFail("expected today") }
+        guard case let .future(_, futureEstimated) = result[3] else { return XCTFail("expected future") }
+        XCTAssertTrue(todayEstimated)
+        XCTAssertTrue(futureEstimated)
+    }
+
     // MARK: - Budget End Marker
 
     func testTodayBudgetEnd_isDayStartPlusBudget() {

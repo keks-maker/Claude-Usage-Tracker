@@ -74,6 +74,11 @@
 "popover.daily_budget.today_limit_estimated" = "今日: 残り約 %@%%（目安 約%@%%）· 上限 約%@%%";
 "popover.daily_budget.day_marker" = "%@: 終点 %@%%";
 "popover.daily_budget.today_marker_hint" = "使わなかった予算は今日も利用でき、明日以降の残り日数に配分されます。";
+"popover.daily_budget.detail_prefix" = "%@：";
+"popover.daily_budget.detail_past" = "%@%%／%@%% 使用済み · 残りは以降の日に配分";
+"popover.daily_budget.detail_future" = "予算 %@%%";
+"popover.daily_budget.detail_future_estimated" = "予算 約%@%%";
+"popover.daily_budget.detail_none" = "データなし";
 "menubar.anthropic_console" = "Anthropic APIコンソール";
 "menubar.used" = "使用済み";
 "menubar.remaining" = "残り";

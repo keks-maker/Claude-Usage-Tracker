@@ -75,6 +75,11 @@
 "popover.daily_budget.today_limit_estimated" = "今日：约剩余 %@%%，预算约 %@%% · 上限约 %@%%";
 "popover.daily_budget.day_marker" = "%@：终点 %@%%";
 "popover.daily_budget.today_marker_hint" = "未用完的预算今天仍可使用，明天才会分配到剩余的天数。";
+"popover.daily_budget.detail_prefix" = "%@：";
+"popover.daily_budget.detail_past" = "已使用 %@%%／%@%%，剩余已分配到之后的日子";
+"popover.daily_budget.detail_future" = "预算 %@%%";
+"popover.daily_budget.detail_future_estimated" = "预算约 %@%%";
+"popover.daily_budget.detail_none" = "无数据";
 "menubar.anthropic_console" = "Anthropic API 控制台";
 "menubar.api_cost" = "API 费用";
 "menubar.cost_source.api" = "API";

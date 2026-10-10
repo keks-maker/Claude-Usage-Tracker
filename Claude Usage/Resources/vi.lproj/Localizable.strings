@@ -80,6 +80,11 @@
 "popover.daily_budget.today_limit_estimated" = "hôm nay: còn khoảng %@%% trên %@%% · giới hạn ở ~%@%%";
 "popover.daily_budget.day_marker" = "%@: kết thúc ở %@%%";
 "popover.daily_budget.today_marker_hint" = "Ngân sách chưa dùng vẫn khả dụng hôm nay và ngày mai mới được chia cho các ngày còn lại.";
+"popover.daily_budget.detail_prefix" = "%@:";
+"popover.daily_budget.detail_past" = "đã dùng %@%% trên %@%% · phần còn lại được chia cho các ngày sau";
+"popover.daily_budget.detail_future" = "ngân sách %@%%";
+"popover.daily_budget.detail_future_estimated" = "ngân sách khoảng %@%%";
+"popover.daily_budget.detail_none" = "không có dữ liệu";
 "menubar.anthropic_console" = "Anthropic API Console";
 "menubar.used" = "Đã dùng";
 "menubar.remaining" = "Còn lại";

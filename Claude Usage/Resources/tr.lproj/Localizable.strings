@@ -80,6 +80,11 @@
 "popover.daily_budget.today_limit_estimated" = "bugün: yaklaşık kalan %@%% / %@%% · sınır ~%@%%";
 "popover.daily_budget.day_marker" = "%@: %@%% noktasında biter";
 "popover.daily_budget.today_marker_hint" = "Kullanılmayan bütçe bugün kullanılabilir kalır ve yarın kalan günlere dağıtılır.";
+"popover.daily_budget.detail_prefix" = "%@:";
+"popover.daily_budget.detail_past" = "%@%% / %@%% kullanıldı · kalan sonraki günlere dağıtıldı";
+"popover.daily_budget.detail_future" = "bütçe %@%%";
+"popover.daily_budget.detail_future_estimated" = "bütçe yaklaşık %@%%";
+"popover.daily_budget.detail_none" = "veri yok";
 "menubar.anthropic_console" = "Anthropic API Konsolu";
 "menubar.used" = "Kullanılan";
 "menubar.remaining" = "Kalan";

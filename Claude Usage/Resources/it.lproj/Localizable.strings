@@ -72,6 +72,11 @@
 "popover.daily_budget.today_limit_estimated" = "oggi: circa %@%% rimasti di %@%% · limite a ~%@%%";
 "popover.daily_budget.day_marker" = "%@: termina al %@%%";
 "popover.daily_budget.today_marker_hint" = "Il budget non usato resta disponibile oggi e verrà distribuito sui giorni rimanenti domani.";
+"popover.daily_budget.detail_prefix" = "%@:";
+"popover.daily_budget.detail_past" = "%@%% di %@%% usato · il resto è stato distribuito sui giorni successivi";
+"popover.daily_budget.detail_future" = "budget %@%%";
+"popover.daily_budget.detail_future_estimated" = "budget circa %@%%";
+"popover.daily_budget.detail_none" = "nessun dato";
 "menubar.anthropic_console" = "Console API Anthropic";
 "menubar.used" = "Utilizzato";
 "menubar.remaining" = "Rimanente";

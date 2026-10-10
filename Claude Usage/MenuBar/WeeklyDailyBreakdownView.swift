@@ -74,6 +74,11 @@ struct WeeklyDailyBreakdownView: View {
 
     private let calendar = Calendar.current
     private let barAreaHeight: CGFloat = 44
+    /// Two lines of caption2, so hovering never shifts the layout
+    private let detailMinHeight: CGFloat = 28
+
+    /// Column under the pointer; its detail replaces the standard line
+    @State private var hoveredIndex: Int?
 
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -103,7 +108,6 @@ struct WeeklyDailyBreakdownView: View {
             calendar: calendar
         )
         let todayIndex = days.firstIndex { calendar.isDate($0, inSameDayAs: now) }
-        let todayColumn = todayIndex.map { columns[$0] }
         let todayLimit = WeeklyDailyUsage.columnMarkers(
             snapshots: snapshots,
             currentWeeklyPercentage: weeklyPercentage,
@@ -118,28 +122,106 @@ struct WeeklyDailyBreakdownView: View {
                     let isToday = index == todayIndex
                     let usage = columns[index].usage
                     let dayBudget = columns[index].budget
+                    let detail = WeeklyDailyUsage.columnDetail(columns[index], day: days[index], now: now, calendar: calendar)
+                    let text = detailText(detail, day: days[index], todayLimit: todayLimit ?? nil)
                     dayColumn(
                         day: days[index],
                         remainingFraction: WeeklyDailyUsage.dayRemainingFraction(usage: usage, budget: dayBudget),
                         isOverBudget: isOverBudget(usage: usage, budget: dayBudget),
                         isToday: isToday,
+                        isExpired: isPast(detail),
                         isEstimatedFuture: columns[index].isEstimated && (todayIndex.map { index > $0 } ?? false),
                         color: WeeklyDayPalette.color(for: index)
                     )
+                    // Whole column incl. weekday label is the hover area
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside {
+                            hoveredIndex = index
+                        } else if hoveredIndex == index {
+                            hoveredIndex = nil
+                        }
+                    }
+                    .help(text.full)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(text.full)
                 }
             }
             .frame(height: barAreaHeight + 16)
 
-            if let todayColumn, let usage = todayColumn.usage, let budget = todayColumn.budget {
-                let remaining = WeeklyDailyUsage.todayRemaining(usage: usage, budget: budget)
-                Text(todayText(remaining: remaining, budget: budget, limit: todayLimit ?? nil, isEstimated: todayColumn.isEstimated))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+            detailRow(
+                hoveredIndex: hoveredIndex,
+                todayIndex: todayIndex,
+                days: days,
+                columns: columns,
+                now: now,
+                todayLimit: todayLimit ?? nil
+            )
         }
         .padding(.vertical, 4)
+    }
+
+    /// Line under the columns: the hovered column's detail, otherwise today's line.
+    /// Fixed minimum height so showing or changing it never moves the layout.
+    @ViewBuilder
+    private func detailRow(
+        hoveredIndex: Int?,
+        todayIndex: Int?,
+        days: [Date],
+        columns: [WeeklyDailyUsage.ColumnValue],
+        now: Date,
+        todayLimit: WeeklyDailyUsage.ColumnMarker?
+    ) -> some View {
+        let shownIndex = hoveredIndex ?? todayIndex
+        VStack(alignment: .leading, spacing: 0) {
+            if let shownIndex, days.indices.contains(shownIndex), columns.indices.contains(shownIndex) {
+                let detail = WeeklyDailyUsage.columnDetail(columns[shownIndex], day: days[shownIndex], now: now, calendar: calendar)
+                let text = detailText(detail, day: days[shownIndex], todayLimit: todayLimit)
+                // Standard line (nothing hovered) stays quiet; a hovered column gets its weekday in bold
+                let showPrefix = hoveredIndex != nil
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    if hoveredIndex != nil {
+                        Circle()
+                            .fill(WeeklyDayPalette.color(for: shownIndex))
+                            .frame(width: 6, height: 6)
+                    }
+                    (showPrefix && !text.prefix.isEmpty
+                        ? Text(text.prefix).fontWeight(.bold).foregroundColor(.primary) + Text(" " + text.body)
+                        : Text(text.body))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: detailMinHeight, alignment: .topLeading)
+    }
+
+    private func isPast(_ detail: WeeklyDailyUsage.ColumnDetail) -> Bool {
+        if case .past = detail { return true }
+        return false
+    }
+
+    /// Weekday prefix and explanation of one column; `full` joins both for tooltip and VoiceOver.
+    /// Today keeps its existing line (which names the day itself), so it has no prefix.
+    private func detailText(_ detail: WeeklyDailyUsage.ColumnDetail, day: Date, todayLimit: WeeklyDailyUsage.ColumnMarker?) -> (prefix: String, body: String, full: String) {
+        let weekday = Self.weekdayFormatter.string(from: day)
+        let prefix = "popover.daily_budget.detail_prefix".localized(with: weekday)
+        let result: (String, String)
+        switch detail {
+        case .past(let usage, let budget):
+            result = (prefix, "popover.daily_budget.detail_past".localized(with: formatPoints(usage), formatPoints(budget)))
+        case .noData:
+            result = (prefix, "popover.daily_budget.detail_none".localized)
+        case .today(let remaining, let budget, let isEstimated):
+            result = ("", todayText(remaining: remaining, budget: budget, limit: todayLimit, isEstimated: isEstimated))
+        case .future(let budget, let isEstimated):
+            let key = isEstimated ? "popover.daily_budget.detail_future_estimated" : "popover.daily_budget.detail_future"
+            result = (prefix, key.localized(with: formatPoints(budget)))
+        }
+        let full = result.0.isEmpty ? result.1 : result.0 + " " + result.1
+        return (result.0, result.1, full)
     }
 
     /// True once a day's usage has reached the budget that applied to it.
@@ -166,9 +248,9 @@ struct WeeklyDailyBreakdownView: View {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
-    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool, isEstimatedFuture: Bool, color: Color) -> some View {
+    private func dayColumn(day: Date, remainingFraction: Double?, isOverBudget: Bool, isToday: Bool, isExpired: Bool, isEstimatedFuture: Bool, color: Color) -> some View {
         VStack(spacing: 2) {
-            budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget, color: color)
+            budgetBar(remainingFraction: remainingFraction, isOverBudget: isOverBudget, isExpired: isExpired, color: color)
                 .opacity(isEstimatedFuture ? 0.6 : 1)
                 .frame(maxWidth: .infinity, maxHeight: barAreaHeight)
 
@@ -193,7 +275,9 @@ struct WeeklyDailyBreakdownView: View {
     /// Frame = daily budget (full height). Fill = budget still left, emptying from the top as usage grows.
     /// Dashed frame without fill when the day has no data or no budget is known.
     /// A budget of 0 gives a solid, empty frame (already used up).
-    private func budgetBar(remainingFraction: Double?, isOverBudget: Bool, color: Color) -> some View {
+    /// A past day's unused rest has expired (it was spread over the following days): the frame keeps the
+    /// day color, the fill is gray and hatched.
+    private func budgetBar(remainingFraction: Double?, isOverBudget: Bool, isExpired: Bool, color: Color) -> some View {
         let frameColor = isOverBudget ? Color.orange : color
         return ZStack(alignment: .bottom) {
             RoundedRectangle(cornerRadius: 2)
@@ -203,10 +287,35 @@ struct WeeklyDailyBreakdownView: View {
                 )
 
             if let remainingFraction, remainingFraction > 0 {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(isOverBudget ? Color.orange : color.opacity(0.85))
-                    .frame(height: max(1, barAreaHeight * CGFloat(remainingFraction)))
+                let fillHeight = max(1, barAreaHeight * CGFloat(remainingFraction))
+                if isExpired {
+                    HatchedFill()
+                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                        .frame(height: fillHeight)
+                } else {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isOverBudget ? Color.orange : color.opacity(0.85))
+                        .frame(height: fillHeight)
+                }
             }
+        }
+    }
+}
+
+/// Gray diagonal stripes on a faint gray ground; the gray with partial opacity reads in light and dark mode.
+private struct HatchedFill: View {
+    var body: some View {
+        Canvas { context, size in
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.gray.opacity(0.18)))
+            var stripes = Path()
+            let spacing: CGFloat = 4
+            var x = -size.height
+            while x < size.width {
+                stripes.move(to: CGPoint(x: x, y: size.height))
+                stripes.addLine(to: CGPoint(x: x + size.height, y: 0))
+                x += spacing
+            }
+            context.stroke(stripes, with: .color(.gray.opacity(0.75)), lineWidth: 1)
         }
     }
 }

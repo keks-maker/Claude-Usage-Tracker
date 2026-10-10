@@ -83,6 +83,11 @@
 "popover.daily_budget.today_limit_estimated" = "오늘: 남은 약 %@%% / 예산 약 %@%% · 한도 약 %@%%";
 "popover.daily_budget.day_marker" = "%@: 종료 지점 %@%%";
 "popover.daily_budget.today_marker_hint" = "사용하지 않은 예산은 오늘 계속 사용할 수 있으며, 내일 남은 날짜에 분배됩니다.";
+"popover.daily_budget.detail_prefix" = "%@:";
+"popover.daily_budget.detail_past" = "%@%% / %@%% 사용 · 남은 예산은 이후 날짜에 분배됨";
+"popover.daily_budget.detail_future" = "예산 %@%%";
+"popover.daily_budget.detail_future_estimated" = "예산 약 %@%%";
+"popover.daily_budget.detail_none" = "데이터 없음";
 "menubar.anthropic_console" = "Anthropic API 콘솔";
 "menubar.used" = "사용됨";
 "menubar.remaining" = "남음";
